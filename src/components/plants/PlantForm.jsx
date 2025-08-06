@@ -1,0 +1,321 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { getPlantsData, savePlantsData, generatePlantId, convertImageToBase64 } from '../../utils/localStorage';
+import billyBong from '../../assets/billy.png';
+
+const PlantForm = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    strain: '',
+    origin: 'Seed', // Seed or Clone
+    image: null,
+    imagePreview: null
+  });
+  
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear messages when user starts typing
+    if (error) setError('');
+    if (success) setSuccess('');
+  };
+
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please select a valid image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image file must be less than 5MB');
+      return;
+    }
+
+    try {
+      const base64 = await convertImageToBase64(file);
+      setFormData(prev => ({
+        ...prev,
+        image: base64,
+        imagePreview: base64
+      }));
+      setError('');
+    } catch (err) {
+      setError('Failed to process image');
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      // Validate required fields
+      if (!formData.name.trim()) {
+        setError('Plant name is required');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.strain.trim()) {
+        setError('Strain is required');
+        setLoading(false);
+        return;
+      }
+
+      // Create new plant object
+      const newPlant = {
+        id: generatePlantId(),
+        name: formData.name.trim(),
+        strain: formData.strain.trim(),
+        origin: formData.origin,
+        datePlanted: new Date().toISOString(),
+        image: formData.image,
+        diary: '',
+        generation: 1, // First generation for new seeds
+        originalMotherId: null, // Will be set for clones
+        harvested: false,
+        harvestStats: null,
+        createdBy: user.id,
+        createdAt: new Date().toISOString()
+      };
+
+      // Get existing plants and add new one
+      const existingPlants = getPlantsData();
+      const updatedPlants = [...existingPlants, newPlant];
+      
+      // Save to localStorage
+      savePlantsData(updatedPlants);
+
+      setSuccess('Plant added successfully!');
+      
+      // Redirect to plants list after short delay
+      setTimeout(() => {
+        navigate('/plants');
+      }, 1500);
+
+    } catch (err) {
+      setError('Failed to save plant. Please try again.');
+      console.error('Error saving plant:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    navigate('/dashboard');
+  };
+
+  return (
+    <div className="min-h-screen bg-patriot-gray">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="text-patriot-blue hover:text-blue-700 mr-4"
+              >
+                ← Back to Dashboard
+              </button>
+              <h1 className="text-xl font-bold text-patriot-navy">Add New Plant</h1>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-2xl mx-auto p-6">
+        <div className="card">
+          <div className="text-center mb-6">
+            <div className="flex items-center justify-center space-x-4 mb-4">
+              <div className="w-16 h-16">
+                <img 
+                  src={billyBong} 
+                  alt="Billy Bong" 
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div className="text-4xl">🌱</div>
+            </div>
+            <h2 className="text-2xl font-bold text-patriot-navy mb-2">
+              Register New Plant
+            </h2>
+            <p className="text-gray-600">
+              Billy's here to help you add a new plant to your collection!
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Plant Name */}
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                Plant Name *
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className="input-field"
+                placeholder="Give your plant a unique name"
+                required
+              />
+            </div>
+
+            {/* Strain */}
+            <div>
+              <label htmlFor="strain" className="block text-sm font-medium text-gray-700 mb-2">
+                Strain *
+              </label>
+              <input
+                type="text"
+                id="strain"
+                name="strain"
+                value={formData.strain}
+                onChange={handleInputChange}
+                className="input-field"
+                placeholder="e.g., Blue Dream, OG Kush, White Widow"
+                required
+              />
+            </div>
+
+            {/* Origin */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Origin *
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="origin"
+                    value="Seed"
+                    checked={formData.origin === 'Seed'}
+                    onChange={handleInputChange}
+                    className="text-patriot-blue focus:ring-patriot-blue"
+                  />
+                  <span className="text-sm">🌰 From Seed</span>
+                </label>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="origin"
+                    value="Clone"
+                    checked={formData.origin === 'Clone'}
+                    onChange={handleInputChange}
+                    className="text-patriot-blue focus:ring-patriot-blue"
+                  />
+                  <span className="text-sm">🌿 From Clone</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Image Upload */}
+            <div>
+              <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-2">
+                Plant Photo (Optional)
+              </label>
+              <div className="space-y-4">
+                <input
+                  type="file"
+                  id="image"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-patriot-blue file:text-white hover:file:bg-blue-700"
+                />
+                {formData.imagePreview && (
+                  <div className="relative">
+                    <img
+                      src={formData.imagePreview}
+                      alt="Plant preview"
+                      className="w-full h-48 object-cover rounded-lg border border-gray-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, image: null, imagePreview: null }))}
+                      className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Supported formats: JPG, PNG, GIF. Max size: 5MB
+              </p>
+            </div>
+
+            {/* Auto-generated Date Display */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Planting Date
+              </label>
+              <div className="bg-gray-50 border border-gray-300 rounded-md px-3 py-2 text-sm text-gray-600">
+                {new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
+              </div>
+            </div>
+
+            {/* Messages */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-sm text-green-700">{success}</p>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex space-x-4 pt-4">
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Saving Plant...' : 'Add Plant'}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="btn-outline flex-1"
+                disabled={loading}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default PlantForm;
