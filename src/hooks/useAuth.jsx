@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
-  saveAuthSession, 
-  getAuthSession, 
-  clearAuthSession, 
-  isAuthenticated as checkAuth,
-  DEMO_CREDENTIALS 
-} from '../utils/localStorage';
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from 'firebase/auth';
+import { auth } from '../config/firebase';
+import { logger } from '../utils/logger';
 
 const AuthContext = createContext();
 
@@ -23,65 +24,119 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing auth session on mount
-    const session = getAuthSession();
-    if (session && session.isAuthenticated) {
-      setUser(session.user);
-      setIsAuthenticated(true);
-    }
-    setLoading(false);
-  }, []);
-
-  const login = async (username, password) => {
-    try {
-      // Mock authentication - check against demo credentials
-      if (username === DEMO_CREDENTIALS.username && password === DEMO_CREDENTIALS.password) {
+    // Listen for authentication state changes
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        // User is signed in
         const userData = {
-          id: 'demo_user_1',
-          username: username,
-          email: 'demo@phenohunter.com',
-          name: 'Demo User'
+          id: firebaseUser.uid,
+          email: firebaseUser.email,
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0]
         };
-        
         setUser(userData);
         setIsAuthenticated(true);
-        saveAuthSession(userData);
-        
-        return { success: true, user: userData };
+        logger.info('User authenticated', { userId: userData.id });
       } else {
-        return { success: false, error: 'Invalid credentials' };
+        // User is signed out
+        setUser(null);
+        setIsAuthenticated(false);
+        logger.info('User signed out');
       }
-    } catch (error) {
-      console.error('Login error:', error);
-      return { success: false, error: 'Login failed' };
-    }
-  };
+      setLoading(false);
+    });
 
-  const signup = async (username, email, password) => {
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
+
+  const login = async (email, password) => {
     try {
-      // Mock signup - for demo, just create a user with provided info
+      setLoading(true);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
       const userData = {
-        id: 'user_' + Date.now(),
-        username: username,
-        email: email,
-        name: username
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: firebaseUser.displayName || firebaseUser.email.split('@')[0]
       };
       
-      setUser(userData);
-      setIsAuthenticated(true);
-      saveAuthSession(userData);
-      
+      logger.info('User logged in successfully', { userId: userData.id });
       return { success: true, user: userData };
     } catch (error) {
-      console.error('Signup error:', error);
-      return { success: false, error: 'Signup failed' };
+      logger.error('Login error', { error: error.message });
+      let errorMessage = 'Login failed';
+      
+      // Handle specific Firebase auth errors
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'Incorrect password';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        case 'auth/user-disabled':
+          errorMessage = 'This account has been disabled';
+          break;
+        default:
+          errorMessage = error.message;
+      }
+      
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setIsAuthenticated(false);
-    clearAuthSession();
+  const signup = async (email, password, name) => {
+    try {
+      setLoading(true);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      const userData = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email,
+        name: name || firebaseUser.email.split('@')[0]
+      };
+      
+      logger.info('User signed up successfully', { userId: userData.id });
+      return { success: true, user: userData };
+    } catch (error) {
+      logger.error('Signup error', { error: error.message });
+      let errorMessage = 'Signup failed';
+      
+      // Handle specific Firebase auth errors
+      switch (error.code) {
+        case 'auth/email-already-in-use':
+          errorMessage = 'An account with this email already exists';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        case 'auth/weak-password':
+          errorMessage = 'Password should be at least 6 characters';
+          break;
+        default:
+          errorMessage = error.message;
+      }
+      
+      return { success: false, error: errorMessage };
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      logger.info('User logged out');
+    } catch (error) {
+      logger.error('Logout error', { error: error.message });
+    }
   };
 
   const value = {

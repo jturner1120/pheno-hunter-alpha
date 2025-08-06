@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Setup Guide - Pheno Hunter</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .step { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .code { background: #272822; color: #f8f8f2; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Pheno Hunter - Firebase Setup Guide</h1>
+    
+    <div class="step success">
+        <h3>✅ Step 1 Complete: Local Setup</h3>
+        <p>Firebase SDK installed and configuration files created!</p>
+    </div>
+
+    <div class="step warning">
+        <h3>⏳ Next: Firebase Project Setup</h3>
+        <p>Follow these steps to create your free Firebase project:</p>
+        
+        <ol>
+            <li><strong>Go to Firebase Console:</strong> <a href="https://console.firebase.google.com" target="_blank">console.firebase.google.com</a></li>
+            <li><strong>Create New Project:</strong> Click "Create a project"</li>
+            <li><strong>Project Name:</strong> "phenohunter-alpha"</li>
+            <li><strong>Google Analytics:</strong> Optional (can skip for alpha)</li>
+        </ol>
+    </div>
+
+    <div class="step">
+        <h3>📝 Firebase Configuration Steps</h3>
+        
+        <h4>1. Enable Authentication:</h4>
+        <ul>
+            <li>Go to Authentication → Sign-in method</li>
+            <li>Enable "Email/Password"</li>
+            <li>Disable "Email link (passwordless sign-in)"</li>
+        </ul>
+
+        <h4>2. Create Firestore Database:</h4>
+        <ul>
+            <li>Go to Firestore Database → Create database</li>
+            <li>Start in "Test mode" (we'll secure it later)</li>
+            <li>Choose location closest to your users</li>
+        </ul>
+
+        <h4>3. Enable Storage:</h4>
+        <ul>
+            <li>Go to Storage → Get started</li>
+            <li>Start in "Test mode"</li>
+            <li>Use same location as Firestore</li>
+        </ul>
+
+        <h4>4. Get Configuration:</h4>
+        <ul>
+            <li>Go to Project Settings (gear icon)</li>
+            <li>Scroll to "Your apps" section</li>
+            <li>Click "Web app" icon (&lt;/&gt;)</li>
+            <li>App nickname: "phenohunter-web"</li>
+            <li>Copy the configuration object</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>🔧 Update Local Configuration</h3>
+        <p>Update your <code>.env.local</code> file with the Firebase config values:</p>
+        <div class="code">
+VITE_FIREBASE_API_KEY=your-actual-api-key
+VITE_FIREBASE_AUTH_DOMAIN=phenohunter-alpha.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=phenohunter-alpha
+VITE_FIREBASE_STORAGE_BUCKET=phenohunter-alpha.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+VITE_FIREBASE_APP_ID=your-app-id
+        </div>
+    </div>
+
+    <div class="step">
+        <h3>🚀 Vercel Deployment Steps</h3>
+        <ol>
+            <li><strong>Go to Vercel:</strong> <a href="https://vercel.com" target="_blank">vercel.com</a></li>
+            <li><strong>Sign up:</strong> Use GitHub account (free)</li>
+            <li><strong>Import Git Repository:</strong> Connect your GitHub repo</li>
+            <li><strong>Deploy:</strong> Click "Deploy" (uses automatic settings)</li>
+            <li><strong>Environment Variables:</strong> Add your Firebase config to Vercel dashboard</li>
+        </ol>
+    </div>
+
+    <div class="step success">
+        <h3>🎯 Success Criteria</h3>
+        <p>You'll know everything works when:</p>
+        <ul>
+            <li>✅ App loads at your-app.vercel.app</li>
+            <li>✅ No console errors about Firebase</li>
+            <li>✅ Login page appears</li>
+            <li>✅ Can create test account</li>
+        </ul>
+    </div>
+
+    <div class="step">
+        <h3>📞 Need Help?</h3>
+        <p>If you get stuck, check the Firebase docs or ask for help with specific error messages.</p>
+        <p><strong>Common issues:</strong></p>
+        <ul>
+            <li>Environment variables not loading → Restart dev server</li>
+            <li>Firebase errors → Check API key and project ID</li>
+            <li>Deploy fails → Check build command in Vercel</li>
+        </ul>
+    </div>
+
+</body>
+</html>

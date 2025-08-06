@@ -5,7 +5,7 @@ import billyBong from '../../assets/billy.png';
 
 const SignUp = () => {
   const [formData, setFormData] = useState({
-    username: '',
+    name: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -54,7 +54,7 @@ const SignUp = () => {
       return;
     }
 
-    const result = await signup(formData.username, formData.email, formData.password);
+    const result = await signup(formData.email, formData.password, formData.name);
     
     if (result.success) {
       navigate('/dashboard');
@@ -84,17 +84,17 @@ const SignUp = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-              Username
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              Name
             </label>
             <input
               type="text"
-              id="username"
-              name="username"
-              value={formData.username}
+              id="name"
+              name="name"
+              value={formData.name}
               onChange={handleChange}
               className="input-field"
-              placeholder="Choose a username"
+              placeholder="Enter your full name"
               required
             />
           </div>

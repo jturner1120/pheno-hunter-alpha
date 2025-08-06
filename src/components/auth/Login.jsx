@@ -5,7 +5,7 @@ import billyBong from '../../assets/billy.png';
 
 const Login = () => {
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [error, setError] = useState('');
@@ -35,7 +35,7 @@ const Login = () => {
     setLoading(true);
     setError('');
 
-    const result = await login(formData.username, formData.password);
+    const result = await login(formData.email, formData.password);
     
     if (result.success) {
       navigate('/dashboard');
@@ -65,24 +65,24 @@ const Login = () => {
 
         {/* Demo credentials info */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <h3 className="text-sm font-semibold text-blue-800 mb-2">Demo Credentials:</h3>
-          <p className="text-sm text-blue-700">Username: <code className="bg-blue-100 px-1 rounded">demo</code></p>
-          <p className="text-sm text-blue-700">Password: <code className="bg-blue-100 px-1 rounded">hunter123</code></p>
+          <h3 className="text-sm font-semibold text-blue-800 mb-2">Create a test account:</h3>
+          <p className="text-sm text-blue-700">Use any email and password (min 6 chars)</p>
+          <p className="text-sm text-blue-700">Example: <code className="bg-blue-100 px-1 rounded">test@example.com</code></p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-              Username
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              Email
             </label>
             <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
               onChange={handleChange}
               className="input-field"
-              placeholder="Enter your username"
+              placeholder="Enter your email"
               required
             />
           </div>
