@@ -13,7 +13,7 @@ const SignUp = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { signup, isAuthenticated } = useAuth();
+  const { signup, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   // Redirect if already authenticated
@@ -22,6 +22,18 @@ const SignUp = () => {
       navigate('/dashboard');
     }
   }, [isAuthenticated, navigate]);
+
+  // Show loading spinner while auth state is being determined
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-patriot-gray">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-patriot-blue mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleChange = (e) => {
     setFormData({

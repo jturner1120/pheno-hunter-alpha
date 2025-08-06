@@ -51,20 +51,13 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      setLoading(true);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       
-      const userData = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email,
-        name: firebaseUser.displayName || firebaseUser.email.split('@')[0]
-      };
-      
-      logger.info('User logged in successfully', { userId: userData.id });
-      return { success: true, user: userData };
+      logger.info('User logged in successfully', { userId: firebaseUser.uid });
+      return { success: true };
     } catch (error) {
-      logger.error('Login error', { error: error.message });
+      logger.error('Login error', { error: error.message, code: error.code });
       let errorMessage = 'Login failed';
       
       // Handle specific Firebase auth errors
@@ -81,32 +74,26 @@ export const AuthProvider = ({ children }) => {
         case 'auth/user-disabled':
           errorMessage = 'This account has been disabled';
           break;
+        case 'auth/invalid-credential':
+          errorMessage = 'Invalid email or password';
+          break;
         default:
           errorMessage = error.message;
       }
       
       return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
     }
   };
 
   const signup = async (email, password, name) => {
     try {
-      setLoading(true);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       
-      const userData = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email,
-        name: name || firebaseUser.email.split('@')[0]
-      };
-      
-      logger.info('User signed up successfully', { userId: userData.id });
-      return { success: true, user: userData };
+      logger.info('User signed up successfully', { userId: firebaseUser.uid });
+      return { success: true };
     } catch (error) {
-      logger.error('Signup error', { error: error.message });
+      logger.error('Signup error', { error: error.message, code: error.code });
       let errorMessage = 'Signup failed';
       
       // Handle specific Firebase auth errors
@@ -125,8 +112,6 @@ export const AuthProvider = ({ children }) => {
       }
       
       return { success: false, error: errorMessage };
-    } finally {
-      setLoading(false);
     }
   };
 
