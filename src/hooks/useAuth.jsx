@@ -24,8 +24,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔥 Setting up Firebase auth listener...');
     // Listen for authentication state changes
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      console.log('🔥 Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
       if (firebaseUser) {
         // User is signed in
         const userData = {
@@ -33,11 +35,13 @@ export const AuthProvider = ({ children }) => {
           email: firebaseUser.email,
           name: firebaseUser.displayName || firebaseUser.email.split('@')[0]
         };
+        console.log('🔥 User data:', userData);
         setUser(userData);
         setIsAuthenticated(true);
         logger.info('User authenticated', { userId: userData.id });
       } else {
         // User is signed out
+        console.log('🔥 User signed out');
         setUser(null);
         setIsAuthenticated(false);
         logger.info('User signed out');
@@ -51,12 +55,15 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
+      console.log('🔥 Attempting login for:', email);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       
+      console.log('🔥 Login successful:', firebaseUser.uid);
       logger.info('User logged in successfully', { userId: firebaseUser.uid });
       return { success: true };
     } catch (error) {
+      console.error('🔥 Login error:', error.code, error.message);
       logger.error('Login error', { error: error.message, code: error.code });
       let errorMessage = 'Login failed';
       
@@ -87,12 +94,15 @@ export const AuthProvider = ({ children }) => {
 
   const signup = async (email, password, name) => {
     try {
+      console.log('🔥 Attempting signup for:', email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       
+      console.log('🔥 Signup successful:', firebaseUser.uid);
       logger.info('User signed up successfully', { userId: firebaseUser.uid });
       return { success: true };
     } catch (error) {
+      console.error('🔥 Signup error:', error.code, error.message);
       logger.error('Signup error', { error: error.message, code: error.code });
       let errorMessage = 'Signup failed';
       
