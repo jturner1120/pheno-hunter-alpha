@@ -12,7 +12,7 @@ const FirebaseConfigCheck = () => {
 
   return (
     <div className="fixed top-4 left-4 bg-yellow-400 text-black p-4 rounded-lg text-xs max-w-md z-50">
-      <div className="font-bold mb-2">🔧 FIREBASE CONFIG CHECK</div>
+      <div className="font-bold mb-2">🔧 FIREBASE CONFIG CHECK v2</div>
       {Object.entries(config).map(([key, value]) => (
         <div key={key}>
           <strong>{key}:</strong> {value ? '✅ SET' : '❌ MISSING'}

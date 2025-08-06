@@ -6,7 +6,7 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
-import { logger } from '../utils/logger';
+import { logInfo, logError } from '../utils/logger';
 
 const AuthContext = createContext();
 
@@ -38,13 +38,13 @@ export const AuthProvider = ({ children }) => {
         console.log('🔥 User data:', userData);
         setUser(userData);
         setIsAuthenticated(true);
-        logger.info('User authenticated', { userId: userData.id });
+        logInfo('User authenticated', { userId: userData.id });
       } else {
         // User is signed out
         console.log('🔥 User signed out');
         setUser(null);
         setIsAuthenticated(false);
-        logger.info('User signed out');
+        logInfo('User signed out');
       }
       setLoading(false);
     });
@@ -60,11 +60,11 @@ export const AuthProvider = ({ children }) => {
       const firebaseUser = userCredential.user;
       
       console.log('🔥 Login successful:', firebaseUser.uid);
-      logger.info('User logged in successfully', { userId: firebaseUser.uid });
+      logInfo('User logged in successfully', { userId: firebaseUser.uid });
       return { success: true };
     } catch (error) {
       console.error('🔥 Login error:', error.code, error.message);
-      logger.error('Login error', { error: error.message, code: error.code });
+      logError(error, { operation: 'login', email });
       let errorMessage = 'Login failed';
       
       // Handle specific Firebase auth errors
@@ -99,11 +99,11 @@ export const AuthProvider = ({ children }) => {
       const firebaseUser = userCredential.user;
       
       console.log('🔥 Signup successful:', firebaseUser.uid);
-      logger.info('User signed up successfully', { userId: firebaseUser.uid });
+      logInfo('User signed up successfully', { userId: firebaseUser.uid });
       return { success: true };
     } catch (error) {
       console.error('🔥 Signup error:', error.code, error.message);
-      logger.error('Signup error', { error: error.message, code: error.code });
+      logError(error, { operation: 'signup', email });
       let errorMessage = 'Signup failed';
       
       // Handle specific Firebase auth errors
@@ -128,9 +128,9 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       await signOut(auth);
-      logger.info('User logged out');
+      logInfo('User logged out');
     } catch (error) {
-      logger.error('Logout error', { error: error.message });
+      logError(error, { operation: 'logout' });
     }
   };
 
