@@ -320,7 +320,7 @@ const PlantDetail = () => {
                 </div>
                 <div>
                   <span className="font-medium text-gray-600">Generation:</span>
-                  <p className="text-gray-900">Gen {plant?.cloneGeneration || 1}</p>
+                  <p className="text-gray-900">Gen {(plant?.cloneGeneration || 0) + 1}</p>
                 </div>
               </div>
 
@@ -505,7 +505,7 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
         strainCode: plant.strainCode, // Inherit strain code from parent
         origin: 'Clone',
         isClone: true,
-        cloneGeneration: (plant.cloneGeneration || 0) + 1,
+        cloneGeneration: (plant.cloneGeneration || 0) + 1, // Increment from parent generation
         parentPlantId: plant.id, // Reference to parent plant
         diary: `Cloned from ${plant.name} on ${new Date().toLocaleDateString()}`,
         status: 'seedling',

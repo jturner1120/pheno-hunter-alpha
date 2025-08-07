@@ -274,7 +274,7 @@ const PlantsList = () => {
                           {formatDate(plant.plantedDate || plant.datePlanted)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          Gen {plant.cloneGeneration || plant.generation || 1}
+                          Gen {(plant.cloneGeneration || 0) + 1}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(plant)}
@@ -340,7 +340,7 @@ const PlantsList = () => {
                         )}
                         <p><span className="font-medium">Origin:</span> {plant.origin || (plant.isClone ? 'Clone' : 'Seed') === 'Seed' ? '🌰' : '🌿'} {plant.origin || (plant.isClone ? 'Clone' : 'Seed')}</p>
                         <p><span className="font-medium">Planted:</span> {formatDate(plant.plantedDate || plant.datePlanted)}</p>
-                        <p><span className="font-medium">Generation:</span> {plant.cloneGeneration || plant.generation || 1}</p>
+                        <p><span className="font-medium">Generation:</span> {(plant.cloneGeneration || 0) + 1}</p>
                       </div>
                       <div className="mt-4 flex space-x-3">
                         <button

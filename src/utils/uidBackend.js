@@ -78,3 +78,14 @@ export const addPlantWithUIDFields = async (userId, plantId, plantData) => {
     updated_at: serverTimestamp(),
   }, { merge: true });
 };
+
+// --- Counter Reset Utilities (for development/testing) ---
+export const resetSeedCounter = async (userId, strainCode, dateBorn) => {
+  const counterRef = getSeedCounterRef(userId, strainCode, dateBorn);
+  await updateDoc(counterRef, { seq: 0 });
+};
+
+export const resetCloneCounter = async (userId, parentPlantId) => {
+  const counterRef = getCloneCounterRef(userId, parentPlantId);
+  await updateDoc(counterRef, { seq: 0 });
+};
