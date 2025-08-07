@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getPlantById, updatePlant, createPlant } from '../../utils/firestore';
 import { useAuth } from '../../hooks/useAuth';
 import { uploadPlantImageSmart, deletePlantImageSmart } from '../../utils/imageUtils';
+import { generateCloneUID } from '../../utils/uidGeneration';
 import billyBong from '../../assets/billy.png';
 
 const PlantDetail = () => {
@@ -484,12 +485,28 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
         return;
       }
 
+      // Generate UID for the clone
+      let cloneUID;
+      try {
+        if (plant.uid) {
+          const uidResult = await generateCloneUID(user.id, plant.uid, plant.id);
+          cloneUID = uidResult.uid;
+        }
+      } catch (uidError) {
+        console.warn('Failed to generate clone UID:', uidError);
+        // Continue without UID rather than failing the clone creation
+      }
+
       // Create clone plant (without image first)
       const newClone = {
+        uid: cloneUID, // Add the generated UID
         name: formData.name.trim(),
         strain: plant.strain,
+        strainCode: plant.strainCode, // Inherit strain code from parent
+        origin: 'Clone',
         isClone: true,
         cloneGeneration: (plant.cloneGeneration || 0) + 1,
+        parentPlantId: plant.id, // Reference to parent plant
         diary: `Cloned from ${plant.name} on ${new Date().toLocaleDateString()}`,
         status: 'seedling',
         environment: {
