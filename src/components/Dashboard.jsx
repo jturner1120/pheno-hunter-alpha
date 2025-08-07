@@ -1,47 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { loadDemoData, resetWithDemoData, clearAllData } from '../utils/demoData';
-import { getPlantsData } from '../utils/localStorage';
+import { getUserPlants, getPlantStats } from '../utils/firestore';
 import billyBong from '../assets/billy.png';
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [plants, setPlants] = useState([]);
-  const [showDemoOptions, setShowDemoOptions] = useState(false);
+  const [stats, setStats] = useState({ total: 0, active: 0, clones: 0, harvested: 0 });
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setPlants(getPlantsData());
-  }, []);
+    loadDashboardData();
+  }, [user?.id]);
+
+  const loadDashboardData = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const [userPlants, plantStats] = await Promise.all([
+        getUserPlants(user.id),
+        getPlantStats(user.id)
+      ]);
+      
+      setPlants(userPlants);
+      setStats(plantStats);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
-
-  const handleLoadDemoData = () => {
-    const demoPlants = loadDemoData();
-    setPlants(demoPlants);
-    setShowDemoOptions(false);
-  };
-
-  const handleResetWithDemo = () => {
-    const demoPlants = resetWithDemoData();
-    setPlants(demoPlants);
-    setShowDemoOptions(false);
-  };
-
-  const handleClearData = () => {
-    clearAllData();
-    setPlants([]);
-    setShowDemoOptions(false);
-  };
-
-  // Calculate stats
-  const activePlants = plants.filter(plant => !plant.harvested).length;
-  const clonesMade = plants.filter(plant => plant.origin === 'Clone').length;
-  const harvestedPlants = plants.filter(plant => plant.harvested).length;
 
   return (
     <div className="min-h-screen bg-patriot-gray">
@@ -143,64 +141,29 @@ const Dashboard = () => {
 
         {/* Quick Stats */}
         <div className="mt-8 text-center">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-md mx-auto">
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="text-2xl font-bold text-patriot-navy">{activePlants}</div>
-              <div className="text-sm text-gray-600">Active Plants</div>
+          {loading ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-patriot-blue mr-2"></div>
+              <span className="text-gray-600">Loading your plants...</span>
             </div>
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="text-2xl font-bold text-patriot-red">{clonesMade}</div>
-              <div className="text-sm text-gray-600">Clones Made</div>
-            </div>
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <div className="text-2xl font-bold text-patriot-blue">{harvestedPlants}</div>
-              <div className="text-sm text-gray-600">Harvested</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Demo Data Controls */}
-        <div className="mt-8 text-center">
-          <button
-            onClick={() => setShowDemoOptions(!showDemoOptions)}
-            className="text-sm text-gray-500 hover:text-gray-700 underline"
-          >
-            Demo Data Options
-          </button>
-          
-          {showDemoOptions && (
-            <div className="mt-4 p-4 bg-white rounded-lg shadow-sm max-w-md mx-auto">
-              <p className="text-sm text-gray-600 mb-4">
-                Load sample plants to explore the app features
-              </p>
-              <div className="space-y-2">
-                {plants.length === 0 ? (
-                  <button
-                    onClick={handleLoadDemoData}
-                    className="btn-primary w-full text-sm"
-                  >
-                    Load Demo Data
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleResetWithDemo}
-                      className="btn-outline w-full text-sm"
-                    >
-                      Replace with Demo Data
-                    </button>
-                    <button
-                      onClick={handleClearData}
-                      className="btn-outline text-red-600 border-red-600 hover:bg-red-50 w-full text-sm"
-                    >
-                      Clear All Data
-                    </button>
-                  </>
-                )}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-md mx-auto">
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <div className="text-2xl font-bold text-patriot-navy">{stats.active}</div>
+                <div className="text-sm text-gray-600">Active Plants</div>
+              </div>
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <div className="text-2xl font-bold text-patriot-red">{stats.clones}</div>
+                <div className="text-sm text-gray-600">Clones Made</div>
+              </div>
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <div className="text-2xl font-bold text-patriot-blue">{stats.harvested}</div>
+                <div className="text-sm text-gray-600">Harvested</div>
               </div>
             </div>
           )}
         </div>
+
       </main>
     </div>
   );
