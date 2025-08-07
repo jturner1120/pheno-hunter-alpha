@@ -78,19 +78,21 @@ const PlantDetail = () => {
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image file must be less than 5MB');
+    // Validate file size (max 10MB before compression)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image file must be less than 10MB');
       return;
     }
 
+    setError('Processing image...');
+    
     try {
       const base64 = await convertImageToBase64(file);
       await updatePlantData({ image: base64 });
       setError('');
     } catch (err) {
       console.error('Error uploading image:', err);
-      setError('Failed to process image');
+      setError('Failed to process image. Please try a smaller image or different format.');
     }
   };
 
@@ -399,17 +401,20 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setError('Image file must be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+      setError('Image file must be less than 10MB');
       return;
     }
 
+    setError('Processing image...');
+    
     try {
       const base64 = await convertImageToBase64(file);
       setFormData(prev => ({ ...prev, image: base64, imagePreview: base64 }));
       setError('');
     } catch (err) {
-      setError('Failed to process image');
+      console.error('Clone image processing error:', err);
+      setError('Failed to process image. Please try a smaller image or different format.');
     }
   };
 
