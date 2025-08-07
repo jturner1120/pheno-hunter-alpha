@@ -179,7 +179,7 @@ const PlantForm = () => {
       // Generate UID for the plant (always a seed in new plant form)
       let plantUID;
       try {
-        plantUID = await generateUID(user.id, formData.strainCode, false); // false = not a clone
+        plantUID = await generateSeedUID(user.id, formData.strain, formData.strainCode);
       } catch (uidError) {
         setError(`Failed to generate plant UID: ${uidError.message}`);
         setLoading(false);
