@@ -15,7 +15,7 @@ const PlantForm = () => {
     name: '',
     strain: '',
     strainCode: '', // New field for strain code
-    origin: 'Seed', // Seed or Clone
+    origin: 'Seed', // Always Seed for new plants (clones created from existing plants)
     imageFile: null, // Store the actual file
     imagePreview: null
   });
@@ -170,17 +170,16 @@ const PlantForm = () => {
 
       // Validate strain code
       const strainValidation = validateStrainCode(formData.strainCode);
-      if (!strainValidation.isValid) {
-        setError(`Invalid strain code: ${strainValidation.message}`);
+      if (!strainValidation.valid) {
+        setError(`Invalid strain code: ${strainValidation.error}`);
         setLoading(false);
         return;
       }
 
-      // Generate UID for the plant
+      // Generate UID for the plant (always a seed in new plant form)
       let plantUID;
       try {
-        const isClone = formData.origin === 'Clone';
-        plantUID = await generateUID(user.id, formData.strainCode, isClone);
+        plantUID = await generateUID(user.id, formData.strainCode, false); // false = not a clone
       } catch (uidError) {
         setError(`Failed to generate plant UID: ${uidError.message}`);
         setLoading(false);
@@ -193,10 +192,10 @@ const PlantForm = () => {
         name: formData.name.trim(),
         strain: formData.strain.trim(),
         strainCode: formData.strainCode.trim(),
-        origin: formData.origin,
+        origin: 'Seed', // Always seed for new plants
         status: 'seedling',
-        isClone: formData.origin === 'Clone',
-        cloneGeneration: formData.origin === 'Clone' ? 1 : 0,
+        isClone: false, // Always false for new plants
+        cloneGeneration: 0, // Always 0 for seeds
         diary: '',
         environment: {
           lights: '',
@@ -365,34 +364,23 @@ const PlantForm = () => {
               </div>
             )}
 
-            {/* Origin */}
+            {/* Origin - Only Seeds allowed for new plants */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Origin *
               </label>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="origin"
-                    value="Seed"
-                    checked={formData.origin === 'Seed'}
-                    onChange={handleInputChange}
-                    className="text-patriot-blue focus:ring-patriot-blue"
-                  />
-                  <span className="text-sm">🌰 From Seed</span>
-                </label>
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="origin"
-                    value="Clone"
-                    checked={formData.origin === 'Clone'}
-                    onChange={handleInputChange}
-                    className="text-patriot-blue focus:ring-patriot-blue"
-                  />
-                  <span className="text-sm">🌿 From Clone</span>
-                </label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="radio"
+                  name="origin"
+                  value="Seed"
+                  checked={true}
+                  onChange={handleInputChange}
+                  className="text-patriot-blue focus:ring-patriot-blue"
+                  disabled
+                />
+                <span className="text-sm">🌰 From Seed</span>
+                <span className="text-xs text-gray-500 ml-2">(Clones are created from existing plants)</span>
               </div>
             </div>
 
