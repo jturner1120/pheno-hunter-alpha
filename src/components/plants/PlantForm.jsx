@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { createPlant } from '../../utils/firestore';
-import { convertImageToBase64 } from '../../utils/localStorage';
+import { uploadPlantImageSmart } from '../../utils/imageUtils';
 import billyBong from '../../assets/billy.png';
 
 const PlantForm = () => {
@@ -13,7 +13,7 @@ const PlantForm = () => {
     name: '',
     strain: '',
     origin: 'Seed', // Seed or Clone
-    image: null,
+    imageFile: null, // Store the actual file
     imagePreview: null
   });
   
@@ -49,19 +49,19 @@ const PlantForm = () => {
       return;
     }
 
-    setError('Processing image...');
-    
     try {
-      const base64 = await convertImageToBase64(file);
+      // Create preview URL
+      const previewUrl = URL.createObjectURL(file);
+      
       setFormData(prev => ({
         ...prev,
-        image: base64,
-        imagePreview: base64
+        imageFile: file,
+        imagePreview: previewUrl
       }));
       setError('');
     } catch (err) {
       console.error('Image processing error:', err);
-      setError('Failed to process image. Please try a smaller image or different format.');
+      setError('Failed to process image. Please try a different image.');
     }
   };
 
@@ -84,12 +84,11 @@ const PlantForm = () => {
         return;
       }
 
-      // Create new plant object for Firestore
+      // Create new plant object for Firestore (without image first)
       const newPlant = {
         name: formData.name.trim(),
         strain: formData.strain.trim(),
         origin: formData.origin,
-        image: formData.image,
         status: 'seedling',
         isClone: formData.origin === 'Clone',
         cloneGeneration: formData.origin === 'Clone' ? 1 : 0,
@@ -114,10 +113,27 @@ const PlantForm = () => {
         harvests: []
       };
 
-      // Save to Firestore
+      // Save plant to Firestore first to get an ID
       const plantId = await createPlant(user.id, newPlant);
 
+      // Upload image if provided
+      let imageUrl = null;
+      if (formData.imageFile) {
+        setError('Uploading image...');
+        try {
+          imageUrl = await uploadPlantImageSmart(formData.imageFile, user.id, plantId, 'main');
+          
+          // Update plant with image URL
+          const { updatePlant } = await import('../../utils/firestore');
+          await updatePlant(user.id, plantId, { imageUrl });
+        } catch (imageError) {
+          console.warn('Image upload failed, but plant was created:', imageError);
+          // Don't fail the whole operation if image upload fails
+        }
+      }
+
       setSuccess('Plant added successfully!');
+      setError('');
       
       // Redirect to plants list after short delay
       setTimeout(() => {

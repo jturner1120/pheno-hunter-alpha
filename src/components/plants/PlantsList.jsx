@@ -236,9 +236,9 @@ const PlantsList = () => {
                       <tr key={plant.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            {plant.image ? (
+                            {(plant.imageUrl || plant.image) ? (
                               <img
-                                src={plant.image}
+                                src={plant.imageUrl || plant.image}
                                 alt={plant.name}
                                 className="h-10 w-10 rounded-full object-cover mr-3"
                               />
@@ -303,9 +303,9 @@ const PlantsList = () => {
               {plants.map((plant) => (
                 <div key={plant.id} className="card">
                   <div className="flex items-start space-x-4">
-                    {plant.image ? (
+                    {(plant.imageUrl || plant.image) ? (
                       <img
-                        src={plant.image}
+                        src={plant.imageUrl || plant.image}
                         alt={plant.name}
                         className="h-16 w-16 rounded-lg object-cover"
                       />

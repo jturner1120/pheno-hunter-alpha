@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPlantById, updatePlant, createPlant } from '../../utils/firestore';
 import { useAuth } from '../../hooks/useAuth';
-import { convertImageToBase64 } from '../../utils/localStorage';
+import { uploadPlantImageSmart, deletePlantImageSmart } from '../../utils/imageUtils';
 import billyBong from '../../assets/billy.png';
 
 const PlantDetail = () => {
@@ -84,15 +84,23 @@ const PlantDetail = () => {
       return;
     }
 
-    setError('Processing image...');
+    setError('Uploading image...');
     
     try {
-      const base64 = await convertImageToBase64(file);
-      await updatePlantData({ image: base64 });
+      // Delete old image if it exists and is from Firebase Storage
+      if (plant?.imageUrl) {
+        await deletePlantImageSmart(plant.imageUrl);
+      }
+
+      // Upload new image
+      const imageUrl = await uploadPlantImageSmart(file, user.id, plant.id, 'main');
+      
+      // Update plant with new image URL
+      await updatePlantData({ imageUrl });
       setError('');
     } catch (err) {
       console.error('Error uploading image:', err);
-      setError('Failed to process image. Please try a smaller image or different format.');
+      setError('Failed to upload image. Please try a smaller image or different format.');
     }
   };
 
@@ -218,9 +226,9 @@ const PlantDetail = () => {
             {/* Plant Image */}
             <div className="mb-6">
               <div className="relative">
-                {plant?.image ? (
+                {(plant?.imageUrl || plant?.image) ? (
                   <img
-                    src={plant.image}
+                    src={plant.imageUrl || plant.image}
                     alt={plant.name}
                     className="w-full h-64 object-cover rounded-lg border border-gray-300"
                   />
@@ -386,7 +394,7 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: `${plant.name} Clone`,
-    image: null,
+    imageFile: null,
     imagePreview: null
   });
   const [loading, setLoading] = useState(false);
@@ -409,12 +417,12 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
     setError('Processing image...');
     
     try {
-      const base64 = await convertImageToBase64(file);
-      setFormData(prev => ({ ...prev, image: base64, imagePreview: base64 }));
+      const previewUrl = URL.createObjectURL(file);
+      setFormData(prev => ({ ...prev, imageFile: file, imagePreview: previewUrl }));
       setError('');
     } catch (err) {
       console.error('Clone image processing error:', err);
-      setError('Failed to process image. Please try a smaller image or different format.');
+      setError('Failed to process image. Please try a different image.');
     }
   };
 
@@ -430,19 +438,18 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
         return;
       }
 
-      if (!formData.image) {
+      if (!formData.imageFile) {
         setError('Please add a photo of the clone');
         setLoading(false);
         return;
       }
 
-      // Create clone plant
+      // Create clone plant (without image first)
       const newClone = {
         name: formData.name.trim(),
         strain: plant.strain,
         isClone: true,
         cloneGeneration: (plant.cloneGeneration || 0) + 1,
-        image: formData.image,
         diary: `Cloned from ${plant.name} on ${new Date().toLocaleDateString()}`,
         status: 'seedling',
         environment: {
@@ -465,10 +472,23 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
         harvests: []
       };
 
-      // Save to Firestore
+      // Save clone to Firestore first
       const plantId = await createPlant(user.id, newClone);
 
-      onSuccess({ id: plantId, ...newClone });
+      // Upload clone image
+      let imageUrl = null;
+      if (formData.imageFile) {
+        try {
+          imageUrl = await uploadPlantImageSmart(formData.imageFile, user.id, plantId, 'clone');
+          // Update clone with image URL
+          await updatePlant(user.id, plantId, { imageUrl });
+        } catch (imageError) {
+          console.warn('Clone image upload failed:', imageError);
+          // Continue without image if upload fails
+        }
+      }
+
+      onSuccess({ id: plantId, ...newClone, imageUrl });
     } catch (err) {
       setError('Failed to create clone');
     } finally {
