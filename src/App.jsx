@@ -14,8 +14,6 @@ import PlantForm from './components/plants/PlantForm'
 import PlantsList from './components/plants/PlantsList'
 import PlantDetail from './components/plants/PlantDetail'
 import NotFound from './components/NotFound'
-import AuthDebug from './components/AuthDebug'
-import FirebaseConfigCheck from './components/FirebaseConfigCheck'
 
 function App() {
   return (
@@ -60,8 +58,6 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-          <AuthDebug />
-          <FirebaseConfigCheck />
         </div>
       </Router>
     </AuthProvider>

@@ -1,30 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getPlantsData, savePlantsData } from '../../utils/localStorage';
+import { useAuth } from '../../hooks/useAuth';
+import { getUserPlants, getPlantStats } from '../../utils/firestore';
 import billyBong from '../../assets/billy.png';
 
 const PlantsList = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [plants, setPlants] = useState([]);
+  const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    loadPlants();
-  }, []);
+    if (user) {
+      loadPlants();
+    }
+  }, [user]);
 
-  const loadPlants = () => {
+  const loadPlants = async () => {
     try {
-      const plantsData = getPlantsData();
+      setLoading(true);
+      setError('');
+      
+      const [plantsData, statsData] = await Promise.all([
+        getUserPlants(user.id),
+        getPlantStats(user.id)
+      ]);
+      
       setPlants(plantsData);
+      setStats(statsData);
     } catch (error) {
       console.error('Error loading plants:', error);
+      setError('Failed to load plants. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (dateField) => {
+    if (!dateField) return 'N/A';
+    
+    // Handle Firestore timestamp
+    let date;
+    if (dateField.toDate) {
+      date = dateField.toDate();
+    } else if (typeof dateField === 'string') {
+      date = new Date(dateField);
+    } else {
+      date = dateField;
+    }
+    
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
@@ -32,16 +59,21 @@ const PlantsList = () => {
   };
 
   const getStatusBadge = (plant) => {
-    if (plant.harvested) {
-      return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-          Harvested
-        </span>
-      );
-    }
+    const status = plant.status || (plant.harvested ? 'harvested' : 'active');
+    
+    const statusConfig = {
+      seedling: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Seedling' },
+      vegetative: { bg: 'bg-green-100', text: 'text-green-800', label: 'Vegetative' },
+      flowering: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Flowering' },
+      harvested: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Harvested' },
+      active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Active' }
+    };
+    
+    const config = statusConfig[status] || statusConfig.active;
+    
     return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-        Active
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
+        {config.label}
       </span>
     );
   };
@@ -65,6 +97,26 @@ const PlantsList = () => {
           <div className="flex items-center space-x-3">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-patriot-blue"></div>
             <span className="text-patriot-navy">Loading plants...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-patriot-gray flex items-center justify-center">
+        <div className="card max-w-md">
+          <div className="text-center">
+            <div className="text-red-500 text-4xl mb-4">⚠️</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Plants</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button 
+              onClick={loadPlants}
+              className="btn-primary"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </div>
@@ -127,24 +179,24 @@ const PlantsList = () => {
             {/* Summary Stats */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-lg p-4 shadow-sm">
-                <div className="text-2xl font-bold text-patriot-navy">{plants.length}</div>
+                <div className="text-2xl font-bold text-patriot-navy">{stats.totalPlants || plants.length}</div>
                 <div className="text-sm text-gray-600">Total Plants</div>
               </div>
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <div className="text-2xl font-bold text-green-600">
-                  {plants.filter(p => !p.harvested).length}
+                  {stats.activePlants || plants.filter(p => p.status !== 'harvested' && !p.harvested).length}
                 </div>
                 <div className="text-sm text-gray-600">Active</div>
               </div>
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <div className="text-2xl font-bold text-gray-600">
-                  {plants.filter(p => p.harvested).length}
+                  {stats.harvestedPlants || plants.filter(p => p.status === 'harvested' || p.harvested).length}
                 </div>
                 <div className="text-sm text-gray-600">Harvested</div>
               </div>
               <div className="bg-white rounded-lg p-4 shadow-sm">
                 <div className="text-2xl font-bold text-patriot-blue">
-                  {plants.filter(p => p.origin === 'Clone').length}
+                  {stats.totalClones || plants.filter(p => p.isClone || p.origin === 'Clone').length}
                 </div>
                 <div className="text-sm text-gray-600">Clones</div>
               </div>
@@ -204,13 +256,13 @@ const PlantsList = () => {
                           {plant.strain}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plant.origin === 'Seed' ? '🌰' : '🌿'} {plant.origin}
+                          {plant.origin || (plant.isClone ? 'Clone' : 'Seed') === 'Seed' ? '🌰' : '🌿'} {plant.origin || (plant.isClone ? 'Clone' : 'Seed')}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(plant.datePlanted)}
+                          {formatDate(plant.plantedDate || plant.datePlanted)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          Gen {plant.generation}
+                          Gen {plant.cloneGeneration || plant.generation || 1}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {getStatusBadge(plant)}
@@ -222,7 +274,7 @@ const PlantsList = () => {
                           >
                             View
                           </button>
-                          {!plant.harvested && (
+                          {!plant.harvested && plant.status !== 'harvested' && (
                             <>
                               <button
                                 onClick={() => handleClone(plant)}
@@ -271,9 +323,9 @@ const PlantsList = () => {
                       </div>
                       <div className="space-y-1 text-sm text-gray-600">
                         <p><span className="font-medium">Strain:</span> {plant.strain}</p>
-                        <p><span className="font-medium">Origin:</span> {plant.origin === 'Seed' ? '🌰' : '🌿'} {plant.origin}</p>
-                        <p><span className="font-medium">Planted:</span> {formatDate(plant.datePlanted)}</p>
-                        <p><span className="font-medium">Generation:</span> {plant.generation}</p>
+                        <p><span className="font-medium">Origin:</span> {plant.origin || (plant.isClone ? 'Clone' : 'Seed') === 'Seed' ? '🌰' : '🌿'} {plant.origin || (plant.isClone ? 'Clone' : 'Seed')}</p>
+                        <p><span className="font-medium">Planted:</span> {formatDate(plant.plantedDate || plant.datePlanted)}</p>
+                        <p><span className="font-medium">Generation:</span> {plant.cloneGeneration || plant.generation || 1}</p>
                       </div>
                       <div className="mt-4 flex space-x-3">
                         <button
@@ -282,7 +334,7 @@ const PlantsList = () => {
                         >
                           View Details
                         </button>
-                        {!plant.harvested && (
+                        {!plant.harvested && plant.status !== 'harvested' && (
                           <>
                             <button
                               onClick={() => handleClone(plant)}
