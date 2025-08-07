@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { createPlant } from '../../utils/firestore';
 import { uploadPlantImageSmart } from '../../utils/imageUtils';
+import { getOrCreateStrainCode, getAllUserStrainCodes, validateStrainCode, normalizeStrainCode } from '../../utils/strainValidation';
+import { generateSeedUID, formatDateForUID } from '../../utils/uidGeneration';
 import billyBong from '../../assets/billy.png';
 
 const PlantForm = () => {
@@ -12,6 +14,7 @@ const PlantForm = () => {
   const [formData, setFormData] = useState({
     name: '',
     strain: '',
+    strainCode: '', // New field for strain code
     origin: 'Seed', // Seed or Clone
     imageFile: null, // Store the actual file
     imagePreview: null
@@ -20,17 +23,92 @@ const PlantForm = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uidPreview, setUidPreview] = useState('');
+  const [strainWarning, setStrainWarning] = useState('');
+  const [existingStrains, setExistingStrains] = useState([]);
+  const [showStrainCodeField, setShowStrainCodeField] = useState(false);
+
+  // Load existing strains on component mount
+  useEffect(() => {
+    const loadExistingStrains = async () => {
+      if (user?.id) {
+        try {
+          const strains = await getAllUserStrainCodes(user.id);
+          setExistingStrains(strains);
+        } catch (error) {
+          console.error('Error loading existing strains:', error);
+        }
+      }
+    };
+    loadExistingStrains();
+  }, [user?.id]);
+
+  // Generate UID preview when form data changes
+  useEffect(() => {
+    const generatePreview = async () => {
+      if (formData.strain.trim() && formData.name.trim()) {
+        try {
+          // Check if strain exists
+          const existingStrain = existingStrains.find(s => 
+            s.strainName.toLowerCase() === formData.strain.toLowerCase()
+          );
+          
+          if (existingStrain) {
+            // Use existing strain code
+            const dateBornStr = formatDateForUID(new Date());
+            setUidPreview(`${existingStrain.strainCode}_${dateBornStr}_XX`);
+            setShowStrainCodeField(false);
+            setStrainWarning('');
+          } else {
+            // New strain - show strain code field
+            setShowStrainCodeField(true);
+            if (formData.strainCode.trim()) {
+              const normalizedCode = normalizeStrainCode(formData.strainCode);
+              const validation = validateStrainCode(normalizedCode);
+              if (validation.valid) {
+                const dateBornStr = formatDateForUID(new Date());
+                setUidPreview(`${normalizedCode}_${dateBornStr}_XX`);
+              } else {
+                setUidPreview('Invalid strain code');
+              }
+            } else {
+              setUidPreview('Enter strain code to preview UID');
+            }
+          }
+        } catch (error) {
+          console.error('Error generating UID preview:', error);
+          setUidPreview('Error generating preview');
+        }
+      } else {
+        setUidPreview('');
+        setShowStrainCodeField(false);
+      }
+    };
+
+    generatePreview();
+  }, [formData.strain, formData.strainCode, formData.name, existingStrains]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Special handling for strain code (force uppercase)
+    if (name === 'strainCode') {
+      const normalizedValue = normalizeStrainCode(value);
+      setFormData(prev => ({
+        ...prev,
+        [name]: normalizedValue
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
     
     // Clear messages when user starts typing
     if (error) setError('');
     if (success) setSuccess('');
+    if (strainWarning) setStrainWarning('');
   };
 
   const handleImageChange = async (e) => {
@@ -84,10 +162,37 @@ const PlantForm = () => {
         return;
       }
 
+      if (!formData.strainCode.trim()) {
+        setError('Strain code is required');
+        setLoading(false);
+        return;
+      }
+
+      // Validate strain code
+      const strainValidation = validateStrainCode(formData.strainCode);
+      if (!strainValidation.isValid) {
+        setError(`Invalid strain code: ${strainValidation.message}`);
+        setLoading(false);
+        return;
+      }
+
+      // Generate UID for the plant
+      let plantUID;
+      try {
+        const isClone = formData.origin === 'Clone';
+        plantUID = await generateUID(user.id, formData.strainCode, isClone);
+      } catch (uidError) {
+        setError(`Failed to generate plant UID: ${uidError.message}`);
+        setLoading(false);
+        return;
+      }
+
       // Create new plant object for Firestore (without image first)
       const newPlant = {
+        uid: plantUID, // Add the generated UID
         name: formData.name.trim(),
         strain: formData.strain.trim(),
+        strainCode: formData.strainCode.trim(),
         origin: formData.origin,
         status: 'seedling',
         isClone: formData.origin === 'Clone',
@@ -227,6 +332,38 @@ const PlantForm = () => {
                 required
               />
             </div>
+
+            {/* Strain Code */}
+            <div>
+              <label htmlFor="strainCode" className="block text-sm font-medium text-gray-700 mb-2">
+                Strain Code *
+              </label>
+              <input
+                type="text"
+                id="strainCode"
+                name="strainCode"
+                value={formData.strainCode}
+                onChange={handleInputChange}
+                className="input-field"
+                placeholder="e.g., OGK, WWA (auto-generated if empty)"
+                maxLength={10}
+                required
+              />
+              {strainWarning && (
+                <p className="mt-1 text-sm text-yellow-600">
+                  ⚠️ {strainWarning}
+                </p>
+              )}
+            </div>
+
+            {/* UID Preview */}
+            {formData.strainCode && uidPreview && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-sm font-medium text-blue-800 mb-1">Plant UID Preview:</p>
+                <p className="text-lg font-mono text-blue-900">{uidPreview}</p>
+                <p className="text-xs text-blue-600 mt-1">This unique identifier will be assigned to your plant</p>
+              </div>
+            )}
 
             {/* Origin */}
             <div>

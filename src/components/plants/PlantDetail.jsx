@@ -17,6 +17,7 @@ const PlantDetail = () => {
   const [diaryText, setDiaryText] = useState('');
   const [showHarvestModal, setShowHarvestModal] = useState(false);
   const [showCloneModal, setShowCloneModal] = useState(false);
+  const [copyToast, setCopyToast] = useState(''); // For UID copy feedback
 
   useEffect(() => {
     loadPlant();
@@ -55,6 +56,20 @@ const PlantDetail = () => {
     } catch (err) {
       console.error('Error updating plant:', err);
       setError('Failed to save changes');
+    }
+  };
+
+  const copyUidToClipboard = async () => {
+    if (!plant?.uid) return;
+    
+    try {
+      await navigator.clipboard.writeText(plant.uid);
+      setCopyToast('UID copied!');
+      setTimeout(() => setCopyToast(''), 2000);
+    } catch (err) {
+      console.error('Failed to copy UID:', err);
+      setCopyToast('Failed to copy');
+      setTimeout(() => setCopyToast(''), 2000);
     }
   };
 
@@ -205,6 +220,13 @@ const PlantDetail = () => {
           </div>
         )}
 
+        {/* Copy Toast */}
+        {copyToast && (
+          <div className="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+            <p className="text-sm">{copyToast}</p>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Plant Info Card */}
           <div className="card">
@@ -267,10 +289,28 @@ const PlantDetail = () => {
                   <span className="font-medium text-gray-600">Strain:</span>
                   <p className="text-gray-900">{plant?.strain}</p>
                 </div>
+                {plant?.uid && (
+                  <div>
+                    <span className="font-medium text-gray-600">Plant UID:</span>
+                    <div className="flex items-center space-x-2">
+                      <p className="text-gray-900 font-mono text-sm">{plant.uid}</p>
+                      <button
+                        onClick={copyUidToClipboard}
+                        className="text-patriot-blue hover:text-blue-700 p-1 rounded"
+                        title="Copy UID to clipboard"
+                        aria-label="Copy UID to clipboard"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <span className="font-medium text-gray-600">Origin:</span>
                   <p className="text-gray-900">
-                    {plant?.isClone ? '� Clone' : '� Seed'}
+                    {plant?.isClone ? '🌿 Clone' : '🌰 Seed'}
                   </p>
                 </div>
                 <div>
