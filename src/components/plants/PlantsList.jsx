@@ -215,6 +215,9 @@ const PlantsList = () => {
                         Strain
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        UID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Origin
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -254,6 +257,15 @@ const PlantsList = () => {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {plant.strain}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {plant.uid ? (
+                            <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                              {plant.uid}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">No UID</span>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {plant.origin || (plant.isClone ? 'Clone' : 'Seed') === 'Seed' ? '🌰' : '🌿'} {plant.origin || (plant.isClone ? 'Clone' : 'Seed')}
@@ -323,6 +335,9 @@ const PlantsList = () => {
                       </div>
                       <div className="space-y-1 text-sm text-gray-600">
                         <p><span className="font-medium">Strain:</span> {plant.strain}</p>
+                        {plant.uid && (
+                          <p><span className="font-medium">UID:</span> <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{plant.uid}</span></p>
+                        )}
                         <p><span className="font-medium">Origin:</span> {plant.origin || (plant.isClone ? 'Clone' : 'Seed') === 'Seed' ? '🌰' : '🌿'} {plant.origin || (plant.isClone ? 'Clone' : 'Seed')}</p>
                         <p><span className="font-medium">Planted:</span> {formatDate(plant.plantedDate || plant.datePlanted)}</p>
                         <p><span className="font-medium">Generation:</span> {plant.cloneGeneration || plant.generation || 1}</p>

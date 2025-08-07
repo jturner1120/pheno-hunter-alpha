@@ -5,9 +5,9 @@
   - [x] Validate strain code and generate UID on form submission.
 - [ ] Clone Plant:
   - [ ] Read parent UID, compute next `cXX`, show UID preview.
-- [ ] Plant Details:
-  - [ ] Display UID (read-only) in metadata header.
-  - [ ] Add copy-to-clipboard icon with accessible label and 2s toast ("UID copied").
+- [x] Plant Details:
+  - [x] Display UID (read-only) in metadata header.
+  - [x] Add copy-to-clipboard icon with accessible label and 2s toast ("UID copied").
 - [ ] Plants List:
   - [ ] (Optional) Add UID column, sortable/filterable. new strain, prompt user for 3-letter code (force uppercase, regex: `^[A-Z]{3}$`).
 - [x] Validate code against reserved list (profanity, "XXX", "BAD", etc.) both client and server-side.
