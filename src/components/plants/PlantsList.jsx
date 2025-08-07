@@ -11,6 +11,7 @@ const PlantsList = () => {
   const [stats, setStats] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeFilter, setActiveFilter] = useState('active'); // 'all', 'active', 'harvested', 'clones'
 
   useEffect(() => {
     if (user) {
@@ -89,6 +90,27 @@ const PlantsList = () => {
   const handleHarvest = (plant) => {
     navigate(`/plants/${plant.id}`);
   };
+
+  const getFilteredPlants = () => {
+    switch (activeFilter) {
+      case 'all':
+        return plants.filter(p => p.status !== 'harvested' && !p.harvested);
+      case 'active':
+        return plants.filter(p => p.status !== 'harvested' && !p.harvested);
+      case 'harvested':
+        return plants.filter(p => p.status === 'harvested' || p.harvested);
+      case 'clones':
+        return plants.filter(p => p.isClone || p.origin === 'Clone');
+      default:
+        return plants.filter(p => p.status !== 'harvested' && !p.harvested);
+    }
+  };
+
+  const handleFilterClick = (filterType) => {
+    setActiveFilter(filterType);
+  };
+
+  const filteredPlants = getFilteredPlants();
 
   if (loading) {
     return (
@@ -176,32 +198,84 @@ const PlantsList = () => {
         ) : (
           // Plants Table/Cards
           <div className="space-y-6">
-            {/* Summary Stats */}
+            {/* Summary Stats - Now Clickable Filters */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white rounded-lg p-4 shadow-sm">
+              <button
+                onClick={() => handleFilterClick('all')}
+                className={`bg-white rounded-lg p-4 shadow-sm text-left transition-all hover:shadow-md ${
+                  activeFilter === 'all' ? 'ring-2 ring-patriot-blue bg-blue-50' : ''
+                }`}
+              >
                 <div className="text-2xl font-bold text-patriot-navy">{stats.totalPlants || plants.length}</div>
                 <div className="text-sm text-gray-600">Total Plants</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm">
+              </button>
+              <button
+                onClick={() => handleFilterClick('active')}
+                className={`bg-white rounded-lg p-4 shadow-sm text-left transition-all hover:shadow-md ${
+                  activeFilter === 'active' ? 'ring-2 ring-green-500 bg-green-50' : ''
+                }`}
+              >
                 <div className="text-2xl font-bold text-green-600">
                   {stats.activePlants || plants.filter(p => p.status !== 'harvested' && !p.harvested).length}
                 </div>
                 <div className="text-sm text-gray-600">Active</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm">
+              </button>
+              <button
+                onClick={() => handleFilterClick('harvested')}
+                className={`bg-white rounded-lg p-4 shadow-sm text-left transition-all hover:shadow-md ${
+                  activeFilter === 'harvested' ? 'ring-2 ring-gray-500 bg-gray-50' : ''
+                }`}
+              >
                 <div className="text-2xl font-bold text-gray-600">
                   {stats.harvestedPlants || plants.filter(p => p.status === 'harvested' || p.harvested).length}
                 </div>
                 <div className="text-sm text-gray-600">Harvested</div>
-              </div>
-              <div className="bg-white rounded-lg p-4 shadow-sm">
+              </button>
+              <button
+                onClick={() => handleFilterClick('clones')}
+                className={`bg-white rounded-lg p-4 shadow-sm text-left transition-all hover:shadow-md ${
+                  activeFilter === 'clones' ? 'ring-2 ring-patriot-blue bg-blue-50' : ''
+                }`}
+              >
                 <div className="text-2xl font-bold text-patriot-blue">
                   {stats.totalClones || plants.filter(p => p.isClone || p.origin === 'Clone').length}
                 </div>
                 <div className="text-sm text-gray-600">Clones</div>
-              </div>
+              </button>
             </div>
 
+            {/* Show filtered plants or empty state */}
+            {filteredPlants.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-32 h-32 mx-auto mb-6">
+                  <img 
+                    src={billyBong} 
+                    alt="Billy Bong" 
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <h3 className="text-xl font-semibold text-patriot-navy mb-2">
+                  No {activeFilter === 'all' ? 'active' : activeFilter} plants found
+                </h3>
+                <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                  {activeFilter === 'harvested' 
+                    ? "You haven't harvested any plants yet."
+                    : activeFilter === 'clones'
+                    ? "You haven't created any clones yet."
+                    : "No plants match the current filter."
+                  }
+                </p>
+                {activeFilter !== 'harvested' && (
+                  <button 
+                    onClick={() => navigate('/plant')}
+                    className="btn-primary"
+                  >
+                    Add a Plant
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
             {/* Desktop Table */}
             <div className="hidden md:block card p-0 overflow-hidden">
               <div className="overflow-x-auto">
@@ -235,7 +309,7 @@ const PlantsList = () => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {plants.map((plant) => (
+                    {filteredPlants.map((plant) => (
                       <tr key={plant.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -312,7 +386,7 @@ const PlantsList = () => {
 
             {/* Mobile Cards */}
             <div className="md:hidden space-y-4">
-              {plants.map((plant) => (
+              {filteredPlants.map((plant) => (
                 <div key={plant.id} className="card">
                   <div className="flex items-start space-x-4">
                     {(plant.imageUrl || plant.image) ? (
@@ -371,6 +445,8 @@ const PlantsList = () => {
                 </div>
               ))}
             </div>
+              </>
+            )}
           </div>
         )}
       </main>
