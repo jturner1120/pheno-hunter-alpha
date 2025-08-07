@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { getPlantsData, savePlantsData, generatePlantId, convertImageToBase64 } from '../../utils/localStorage';
+import { createPlant } from '../../utils/firestore';
+import { convertImageToBase64 } from '../../utils/localStorage';
 import billyBong from '../../assets/billy.png';
 
 const PlantForm = () => {
@@ -80,29 +81,38 @@ const PlantForm = () => {
         return;
       }
 
-      // Create new plant object
+      // Create new plant object for Firestore
       const newPlant = {
-        id: generatePlantId(),
         name: formData.name.trim(),
         strain: formData.strain.trim(),
         origin: formData.origin,
-        datePlanted: new Date().toISOString(),
         image: formData.image,
+        status: 'seedling',
+        isClone: formData.origin === 'Clone',
+        cloneGeneration: formData.origin === 'Clone' ? 1 : 0,
         diary: '',
-        generation: 1, // First generation for new seeds
-        originalMotherId: null, // Will be set for clones
-        harvested: false,
-        harvestStats: null,
-        createdBy: user.id,
-        createdAt: new Date().toISOString()
+        environment: {
+          lights: '',
+          temperature: '',
+          humidity: '',
+          medium: ''
+        },
+        nutrients: {
+          schedule: '',
+          brand: '',
+          notes: ''
+        },
+        genetics: {
+          breeder: '',
+          type: '',
+          thc: null,
+          cbd: null
+        },
+        harvests: []
       };
 
-      // Get existing plants and add new one
-      const existingPlants = getPlantsData();
-      const updatedPlants = [...existingPlants, newPlant];
-      
-      // Save to localStorage
-      savePlantsData(updatedPlants);
+      // Save to Firestore
+      const plantId = await createPlant(user.id, newPlant);
 
       setSuccess('Plant added successfully!');
       
@@ -112,7 +122,7 @@ const PlantForm = () => {
       }, 1500);
 
     } catch (err) {
-      setError('Failed to save plant. Please try again.');
+      setError(err.message || 'Failed to save plant. Please try again.');
       console.error('Error saving plant:', err);
     } finally {
       setLoading(false);

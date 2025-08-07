@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getPlantsData, savePlantsData, convertImageToBase64, generatePlantId } from '../../utils/localStorage';
+import { getUserPlant, updatePlant, createPlant } from '../../utils/firestore';
+import { useAuth } from '../../hooks/useAuth';
+import { convertImageToBase64 } from '../../utils/localStorage';
 import billyBong from '../../assets/billy.png';
 
 const PlantDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   const [plant, setPlant] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -19,10 +22,15 @@ const PlantDetail = () => {
     loadPlant();
   }, [id]);
 
-  const loadPlant = () => {
+  const loadPlant = async () => {
+    if (!user?.id) {
+      setError('Please log in to view plant details');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const plants = getPlantsData();
-      const foundPlant = plants.find(p => p.id === id);
+      const foundPlant = await getUserPlant(user.id, id);
       
       if (!foundPlant) {
         setError('Plant not found');
@@ -33,26 +41,25 @@ const PlantDetail = () => {
       setPlant(foundPlant);
       setDiaryText(foundPlant.diary || '');
     } catch (err) {
+      console.error('Error loading plant:', err);
       setError('Failed to load plant details');
     } finally {
       setLoading(false);
     }
   };
 
-  const updatePlant = (updatedPlant) => {
+  const updatePlantData = async (updatedPlantData) => {
     try {
-      const plants = getPlantsData();
-      const updatedPlants = plants.map(p => p.id === id ? updatedPlant : p);
-      savePlantsData(updatedPlants);
-      setPlant(updatedPlant);
+      await updatePlant(user.id, id, updatedPlantData);
+      setPlant(prev => ({ ...prev, ...updatedPlantData }));
     } catch (err) {
+      console.error('Error updating plant:', err);
       setError('Failed to save changes');
     }
   };
 
   const handleDiarySave = () => {
-    const updatedPlant = { ...plant, diary: diaryText };
-    updatePlant(updatedPlant);
+    updatePlantData({ diary: diaryText });
     setEditingDiary(false);
   };
 
@@ -79,24 +86,31 @@ const PlantDetail = () => {
 
     try {
       const base64 = await convertImageToBase64(file);
-      const updatedPlant = { ...plant, image: base64 };
-      updatePlant(updatedPlant);
+      await updatePlantData({ image: base64 });
       setError('');
     } catch (err) {
+      console.error('Error uploading image:', err);
       setError('Failed to process image');
     }
   };
 
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    
+    // Handle Firestore Timestamp
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
   };
 
-  const getDaysOld = (dateString) => {
-    const plantDate = new Date(dateString);
+  const getDaysOld = (timestamp) => {
+    if (!timestamp) return 0;
+    
+    // Handle Firestore Timestamp
+    const plantDate = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     const today = new Date();
     const diffTime = Math.abs(today - plantDate);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -152,7 +166,7 @@ const PlantDetail = () => {
               <h1 className="text-xl font-bold text-patriot-navy">{plant?.name}</h1>
             </div>
             <div className="flex space-x-2">
-              {!plant?.harvested && (
+              {plant?.status !== 'harvested' && (
                 <>
                   <button 
                     onClick={() => setShowCloneModal(true)}
@@ -187,13 +201,13 @@ const PlantDetail = () => {
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold text-patriot-navy mb-2">{plant?.name}</h2>
               <div className="flex items-center justify-center space-x-2 mb-4">
-                {plant?.harvested ? (
+                {plant?.status === 'harvested' ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
                     🌾 Harvested
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                    🌱 Active ({getDaysOld(plant?.datePlanted)} days old)
+                    🌱 {plant?.status} ({getDaysOld(plant?.createdAt)} days old)
                   </span>
                 )}
               </div>
@@ -217,7 +231,7 @@ const PlantDetail = () => {
                   </div>
                 )}
                 
-                {!plant?.harvested && (
+                {plant?.status !== 'harvested' && (
                   <div className="absolute bottom-2 right-2">
                     <label className="bg-patriot-blue text-white rounded-full p-2 cursor-pointer hover:bg-blue-700 transition-colors">
                       <input
@@ -246,45 +260,41 @@ const PlantDetail = () => {
                 <div>
                   <span className="font-medium text-gray-600">Origin:</span>
                   <p className="text-gray-900">
-                    {plant?.origin === 'Seed' ? '🌰' : '🌿'} {plant?.origin}
+                    {plant?.isClone ? '� Clone' : '� Seed'}
                   </p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-600">Date Planted:</span>
-                  <p className="text-gray-900">{formatDate(plant?.datePlanted)}</p>
+                  <p className="text-gray-900">{formatDate(plant?.createdAt)}</p>
                 </div>
                 <div>
                   <span className="font-medium text-gray-600">Generation:</span>
-                  <p className="text-gray-900">Gen {plant?.generation}</p>
+                  <p className="text-gray-900">Gen {plant?.cloneGeneration || 1}</p>
                 </div>
-                {plant?.originalMotherId && (
-                  <div className="col-span-2">
-                    <span className="font-medium text-gray-600">Mother Plant ID:</span>
-                    <p className="text-gray-900 font-mono text-xs">{plant.originalMotherId}</p>
-                  </div>
-                )}
               </div>
 
               {/* Harvest Stats */}
-              {plant?.harvested && plant?.harvestStats && (
+              {plant?.status === 'harvested' && plant?.harvests?.length > 0 && (
                 <div className="border-t pt-4">
                   <h4 className="font-semibold text-gray-800 mb-2">Harvest Stats</h4>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-600">Weight:</span>
-                      <p className="text-gray-900">{plant.harvestStats.weight}</p>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-600">Potency:</span>
-                      <p className="text-gray-900">{plant.harvestStats.potency}</p>
-                    </div>
-                    {plant.harvestStats.notes && (
-                      <div className="col-span-2">
-                        <span className="font-medium text-gray-600">Notes:</span>
-                        <p className="text-gray-900">{plant.harvestStats.notes}</p>
+                  {plant.harvests.map((harvest, index) => (
+                    <div key={index} className="grid grid-cols-2 gap-4 text-sm mb-2">
+                      <div>
+                        <span className="font-medium text-gray-600">Weight:</span>
+                        <p className="text-gray-900">{harvest.weight}</p>
                       </div>
-                    )}
-                  </div>
+                      <div>
+                        <span className="font-medium text-gray-600">Quality:</span>
+                        <p className="text-gray-900">{harvest.quality}</p>
+                      </div>
+                      {harvest.notes && (
+                        <div className="col-span-2">
+                          <span className="font-medium text-gray-600">Notes:</span>
+                          <p className="text-gray-900">{harvest.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -294,7 +304,7 @@ const PlantDetail = () => {
           <div className="card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-patriot-navy">Grow Diary</h3>
-              {!plant?.harvested && !editingDiary && (
+              {plant?.status !== 'harvested' && !editingDiary && (
                 <button 
                   onClick={() => setEditingDiary(true)}
                   className="text-patriot-blue hover:text-blue-700 text-sm"
@@ -371,6 +381,7 @@ const PlantDetail = () => {
 
 // Clone Modal Component
 const CloneModal = ({ plant, onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     name: `${plant.name} Clone`,
     image: null,
@@ -422,27 +433,37 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
 
       // Create clone plant
       const newClone = {
-        id: generatePlantId(),
         name: formData.name.trim(),
         strain: plant.strain,
-        origin: 'Clone',
-        datePlanted: new Date().toISOString(),
+        isClone: true,
+        cloneGeneration: (plant.cloneGeneration || 0) + 1,
         image: formData.image,
         diary: `Cloned from ${plant.name} on ${new Date().toLocaleDateString()}`,
-        generation: plant.generation + 1,
-        originalMotherId: plant.originalMotherId || plant.id,
-        harvested: false,
-        harvestStats: null,
-        createdBy: plant.createdBy,
-        createdAt: new Date().toISOString()
+        status: 'seedling',
+        environment: {
+          lights: '',
+          temperature: '',
+          humidity: '',
+          medium: ''
+        },
+        nutrients: {
+          schedule: '',
+          brand: '',
+          notes: ''
+        },
+        genetics: {
+          breeder: '',
+          type: '',
+          thc: null,
+          cbd: null
+        },
+        harvests: []
       };
 
-      // Save to localStorage
-      const plants = getPlantsData();
-      const updatedPlants = [...plants, newClone];
-      savePlantsData(updatedPlants);
+      // Save to Firestore
+      const plantId = await createPlant(user.id, newClone);
 
-      onSuccess(newClone);
+      onSuccess({ id: plantId, ...newClone });
     } catch (err) {
       setError('Failed to create clone');
     } finally {
@@ -502,7 +523,7 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
               <p className="text-sm text-blue-800">
-                <strong>Clone Info:</strong> This will inherit the strain "{plant.strain}" and be marked as Generation {plant.generation + 1}.
+                <strong>Clone Info:</strong> This will inherit the strain "{plant.strain}" and be marked as Generation {(plant.cloneGeneration || 0) + 1}.
               </p>
             </div>
 
@@ -538,9 +559,10 @@ const CloneModal = ({ plant, onClose, onSuccess }) => {
 
 // Harvest Modal Component
 const HarvestModal = ({ plant, onClose, onSuccess }) => {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     weight: '',
-    potency: '',
+    quality: '',
     notes: ''
   });
   const [loading, setLoading] = useState(false);
@@ -558,24 +580,24 @@ const HarvestModal = ({ plant, onClose, onSuccess }) => {
         return;
       }
 
-      // Update plant with harvest data
-      const harvestedPlant = {
-        ...plant,
-        harvested: true,
-        harvestStats: {
-          weight: formData.weight.trim(),
-          potency: formData.potency.trim() || 'Not specified',
-          notes: formData.notes.trim() || '',
-          harvestDate: new Date().toISOString()
-        }
+      // Create harvest record
+      const newHarvest = {
+        weight: formData.weight.trim(),
+        quality: formData.quality.trim() || 'Not specified',
+        notes: formData.notes.trim() || '',
+        harvestDate: new Date()
       };
 
-      // Save to localStorage
-      const plants = getPlantsData();
-      const updatedPlants = plants.map(p => p.id === plant.id ? harvestedPlant : p);
-      savePlantsData(updatedPlants);
+      // Update plant with harvest data and status
+      const updatedPlant = {
+        status: 'harvested',
+        harvests: [...(plant.harvests || []), newHarvest]
+      };
 
-      onSuccess(harvestedPlant);
+      // Update in Firestore
+      await updatePlant(user.id, plant.id, updatedPlant);
+
+      onSuccess({ ...plant, ...updatedPlant });
     } catch (err) {
       setError('Failed to record harvest');
     } finally {
@@ -613,14 +635,14 @@ const HarvestModal = ({ plant, onClose, onSuccess }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Potency (e.g., "18% THC", "High CBD")
+                Quality (e.g., "Excellent", "Good", "Average")
               </label>
               <input
                 type="text"
-                value={formData.potency}
-                onChange={(e) => setFormData(prev => ({ ...prev, potency: e.target.value }))}
+                value={formData.quality}
+                onChange={(e) => setFormData(prev => ({ ...prev, quality: e.target.value }))}
                 className="input-field"
-                placeholder="Enter potency info (optional)"
+                placeholder="Enter quality assessment (optional)"
               />
             </div>
 
