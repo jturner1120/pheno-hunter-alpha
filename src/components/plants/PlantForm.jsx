@@ -179,7 +179,13 @@ const PlantForm = () => {
       // Generate UID for the plant (always a seed in new plant form)
       let plantUID;
       try {
-        plantUID = await generateSeedUID(user.id, formData.strain, formData.strainCode);
+        const uidResult = await generateSeedUID(user.id, formData.strain, formData.strainCode);
+        plantUID = uidResult.uid; // Extract just the UID string
+        
+        // Show any warnings from strain code generation
+        if (uidResult.warning) {
+          setStrainWarning(uidResult.warning);
+        }
       } catch (uidError) {
         setError(`Failed to generate plant UID: ${uidError.message}`);
         setLoading(false);
