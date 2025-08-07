@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getUserPlant, updatePlant, createPlant } from '../../utils/firestore';
+import { getPlantById, updatePlant, createPlant } from '../../utils/firestore';
 import { useAuth } from '../../hooks/useAuth';
 import { convertImageToBase64 } from '../../utils/localStorage';
 import billyBong from '../../assets/billy.png';
@@ -30,7 +30,7 @@ const PlantDetail = () => {
     }
 
     try {
-      const foundPlant = await getUserPlant(user.id, id);
+      const foundPlant = await getPlantById(user.id, id);
       
       if (!foundPlant) {
         setError('Plant not found');
