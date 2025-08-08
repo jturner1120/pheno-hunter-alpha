@@ -1,6 +1,13 @@
 // src/hooks/useDashboard.js
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate }   // Recent plants (last 5 active plants)
+  const recentPlants = Array.isArray(plants) ? plants
+    .filter(plant => plant.status !== 'harvested' && !plant.harvested)
+    .sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+      return dateB - dateA;
+    })act-router-dom';
 import { useAuth } from './useAuth';
 import { getUserPlants, getPlantStats } from '../utils/firestore';
 import { logInfo, logError } from '../utils/logger';
@@ -42,11 +49,15 @@ const useDashboard = () => {
       ]);
       
       setPlants(userPlants || []);
+      
+      // Ensure userPlants is an array before filtering
+      const plantsArray = Array.isArray(userPlants) ? userPlants : [];
+      
       setStats({
-        total: plantStats?.total || userPlants?.length || 0,
-        active: plantStats?.active || userPlants?.filter(p => p.status !== 'harvested' && !p.harvested).length || 0,
-        clones: plantStats?.clones || userPlants?.filter(p => p.isClone || p.origin === 'clone').length || 0,
-        harvested: plantStats?.harvested || userPlants?.filter(p => p.status === 'harvested' || p.harvested).length || 0
+        total: plantStats?.total || plantsArray.length || 0,
+        active: plantStats?.active || plantsArray.filter(p => p.status !== 'harvested' && !p.harvested).length || 0,
+        clones: plantStats?.clones || plantsArray.filter(p => p.isClone || p.origin === 'clone').length || 0,
+        harvested: plantStats?.harvested || plantsArray.filter(p => p.status === 'harvested' || p.harvested).length || 0
       });
 
       setRetryCount(0); // Reset retry count on success
@@ -107,14 +118,14 @@ const useDashboard = () => {
   }, []);
 
   // Recent plants (last 5 active plants)
-  const recentPlants = plants
+  const recentPlants = Array.isArray(plants) ? plants
     .filter(plant => plant.status !== 'harvested' && !plant.harvested)
     .sort((a, b) => {
       const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
       const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
       return dateB - dateA;
     })
-    .slice(0, 5);
+    .slice(0, 5) : [];
 
   // Load data on mount and user change
   useEffect(() => {

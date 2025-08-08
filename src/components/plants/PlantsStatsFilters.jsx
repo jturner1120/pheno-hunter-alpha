@@ -2,11 +2,14 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 const PlantsStatsFilters = ({ stats, plants, activeFilter, onFilterChange }) => {
+  // Ensure plants is always an array
+  const plantsArray = Array.isArray(plants) ? plants : [];
+  
   const filterConfigs = [
     {
       key: 'all',
       label: 'Total Plants',
-      value: stats.totalPlants || plants.length,
+      value: stats.totalPlants || plantsArray.length,
       bgClass: 'bg-white',
       ringClass: 'ring-patriot-blue',
       bgActiveClass: 'bg-blue-50',
@@ -15,7 +18,7 @@ const PlantsStatsFilters = ({ stats, plants, activeFilter, onFilterChange }) => 
     {
       key: 'active',
       label: 'Active',
-      value: stats.activePlants || plants.filter(p => p.status !== 'harvested' && !p.harvested).length,
+      value: stats.activePlants || plantsArray.filter(p => p.status !== 'harvested' && !p.harvested).length,
       bgClass: 'bg-white',
       ringClass: 'ring-green-500',
       bgActiveClass: 'bg-green-50',
@@ -24,7 +27,7 @@ const PlantsStatsFilters = ({ stats, plants, activeFilter, onFilterChange }) => 
     {
       key: 'harvested',
       label: 'Harvested',
-      value: stats.harvestedPlants || plants.filter(p => p.status === 'harvested' || p.harvested).length,
+      value: stats.harvestedPlants || plantsArray.filter(p => p.status === 'harvested' || p.harvested).length,
       bgClass: 'bg-white',
       ringClass: 'ring-gray-500',
       bgActiveClass: 'bg-gray-50',
@@ -33,7 +36,7 @@ const PlantsStatsFilters = ({ stats, plants, activeFilter, onFilterChange }) => 
     {
       key: 'clones',
       label: 'Clones',
-      value: stats.totalClones || plants.filter(p => p.isClone || p.origin === 'Clone').length,
+      value: stats.totalClones || plantsArray.filter(p => p.isClone || p.origin === 'Clone').length,
       bgClass: 'bg-white',
       ringClass: 'ring-patriot-blue',
       bgActiveClass: 'bg-blue-50',
