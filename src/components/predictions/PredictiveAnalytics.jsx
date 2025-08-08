@@ -1,6 +1,7 @@
 // src/components/predictions/PredictiveAnalytics.jsx
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
 import { usePredictiveAnalytics } from '../../hooks/usePredictiveAnalytics';
 import { useAuth } from '../../hooks/useAuth';
 import ErrorBoundary from '../ErrorBoundary';
@@ -10,6 +11,7 @@ import YieldForecaster from './YieldForecaster';
 import RecommendationEngine from './RecommendationEngine';
 
 const PredictiveAnalytics = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const {
     // State
@@ -123,11 +125,20 @@ const PredictiveAnalytics = () => {
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-6">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Predictive Analytics</h1>
-                <p className="mt-1 text-sm text-gray-600">
-                  AI-powered insights and predictions for your cultivation
-                </p>
+              <div className="flex items-center">
+                <button 
+                  onClick={() => navigate('/dashboard')}
+                  className="text-patriot-blue hover:text-blue-700 mr-4"
+                  aria-label="Back to Dashboard"
+                >
+                  ← Back to Dashboard
+                </button>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Predictive Analytics</h1>
+                  <p className="mt-1 text-sm text-gray-600">
+                    AI-powered insights and predictions for your cultivation
+                  </p>
+                </div>
               </div>
               
               <div className="flex items-center space-x-4">

@@ -1,7 +1,7 @@
 // src/hooks/usePredictiveAnalytics.js
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import { firestoreService } from '../utils/firestore';
+import { getUserPlants, getPlantById, getPlantMetrics, getPlantTimeline } from '../utils/firestore';
 import { 
   GrowthPredictionModel, 
   HarvestPredictionModel, 
@@ -35,14 +35,14 @@ export const usePredictiveAnalytics = () => {
    */
   const loadTrainingData = useCallback(async () => {
     try {
-      const plants = await firestoreService.getUserPlants(user.uid);
+      const plants = await getUserPlants(user.uid);
       const enhancedPlants = [];
 
       // Enhance plant data with metrics and timeline
       for (const plant of plants) {
         try {
-          const metrics = await firestoreService.getPlantMetrics(user.uid, { plantIds: [plant.id] });
-          const timeline = await firestoreService.getPlantTimeline(user.uid, { plantIds: [plant.id] });
+          const metrics = await getPlantMetrics(user.uid, { plantIds: [plant.id] });
+          const timeline = await getPlantTimeline(user.uid, { plantIds: [plant.id] });
           
           enhancedPlants.push({
             ...plant,
@@ -164,9 +164,9 @@ export const usePredictiveAnalytics = () => {
    */
   const generatePlantPredictions = useCallback(async (plantId) => {
     try {
-      const plant = await firestoreService.getPlant(user.uid, plantId);
-      const metrics = await firestoreService.getPlantMetrics(user.uid, { plantIds: [plantId] });
-      const timeline = await firestoreService.getPlantTimeline(user.uid, { plantIds: [plantId] });
+      const plant = await getPlantById(user.uid, plantId);
+      const metrics = await getPlantMetrics(user.uid, { plantIds: [plantId] });
+      const timeline = await getPlantTimeline(user.uid, { plantIds: [plantId] });
 
       const enhancedPlant = {
         ...plant,
@@ -249,7 +249,7 @@ export const usePredictiveAnalytics = () => {
    */
   const generateAllPredictions = useCallback(async () => {
     try {
-      const plants = await firestoreService.getUserPlants(user.uid);
+      const plants = await getUserPlants(user.uid);
       const activePlants = plants.filter(plant => 
         plant.status === 'active' || plant.status === 'growing'
       );

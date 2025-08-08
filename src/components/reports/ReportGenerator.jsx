@@ -1,10 +1,13 @@
 // src/components/reports/ReportGenerator.jsx
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
 import { useReportGeneration } from '../../hooks/useReportGeneration';
 import ErrorBoundary from '../ErrorBoundary';
 
 const ReportGenerator = () => {
+  const navigate = useNavigate();
+  
   const {
     // State
     loading,
@@ -109,11 +112,20 @@ const ReportGenerator = () => {
         <div className="bg-white shadow-sm border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-6">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Report Generator</h1>
-                <p className="mt-1 text-sm text-gray-600">
-                  Generate comprehensive PDF reports for your cultivation data
-                </p>
+              <div className="flex items-center">
+                <button 
+                  onClick={() => navigate('/dashboard')}
+                  className="text-patriot-blue hover:text-blue-700 mr-4"
+                  aria-label="Back to Dashboard"
+                >
+                  ← Back to Dashboard
+                </button>
+                <div>
+                  <h1 className="text-3xl font-bold text-gray-900">Report Generator</h1>
+                  <p className="mt-1 text-sm text-gray-600">
+                    Generate comprehensive PDF reports for your cultivation data
+                  </p>
+                </div>
               </div>
             </div>
           </div>
