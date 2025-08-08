@@ -20,25 +20,28 @@ const PlantsList = () => {
   const {
     // State
     plants,
-    filteredPlants,
+    displayedPlants,
     totalCount,
     stats,
     loading,
+    loadingMore,
     error,
     
     // Search & Filters
-    searchTerm,
+    searchQuery,
     activeFilter,
     sortBy,
     sortOrder,
     
-    // Pagination
-    currentPage,
-    pageSize,
+    // Computed
+    filteredPlantsCount,
     hasMore,
+    currentPage,
     
     // Actions
-    handleSearch,
+    loadPlants,
+    loadMorePlants,
+    handleSearchChange,
     handleFilterChange,
     handleSortChange,
     handleView,
@@ -46,13 +49,15 @@ const PlantsList = () => {
     handleHarvest,
     handleAddPlant,
     handleBackToDashboard,
-    loadMore,
-    retryLoad,
     
     // Utilities
     formatDate,
     getStatusBadge
   } = usePlantsListOptimized();
+
+  // Use displayedPlants as filteredPlants for component compatibility
+  const filteredPlants = displayedPlants;
+  const searchTerm = searchQuery;
 
   // Determine optimal view mode
   const optimalViewMode = useMemo(() => {
@@ -81,7 +86,7 @@ const PlantsList = () => {
   }
 
   if (error && !plants.length) {
-    return <PlantsErrorState error={error} onRetry={retryLoad} />;
+    return <PlantsErrorState error={error} onRetry={loadPlants} />;
   }
 
   return (
@@ -152,16 +157,15 @@ const PlantsList = () => {
             {/* Search and Filters */}
             <PlantsSearchAndFilters
               searchTerm={searchTerm}
-              onSearchChange={handleSearch}
+              onSearchChange={handleSearchChange}
               activeFilter={activeFilter}
               onFilterChange={handleFilterChange}
               sortBy={sortBy}
               sortOrder={sortOrder}
               onSortChange={handleSortChange}
-              totalResults={filteredPlants.length}
+              filteredCount={filteredPlantsCount}
               totalCount={totalCount}
-              showAdvancedFilters={showAdvancedFilters}
-              onToggleAdvancedFilters={handleToggleAdvancedFilters}
+              loading={loading}
             />
 
             {/* Summary Stats - Clickable Filters */}
@@ -191,9 +195,9 @@ const PlantsList = () => {
                     onHarvest={handleHarvest}
                     formatDate={formatDate}
                     getStatusBadge={getStatusBadge}
-                    onLoadMore={loadMore}
+                    onLoadMore={loadMorePlants}
                     hasMore={hasMore}
-                    loading={loading}
+                    loading={loadingMore}
                     height={600}
                     enableVirtualization={true}
                   />
@@ -215,11 +219,11 @@ const PlantsList = () => {
                     {hasMore && (
                       <div className="text-center py-6">
                         <button
-                          onClick={loadMore}
-                          disabled={loading}
+                          onClick={loadMorePlants}
+                          disabled={loadingMore}
                           className="btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {loading ? (
+                          {loadingMore ? (
                             <>
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2 inline-block"></div>
                               Loading...
@@ -249,11 +253,11 @@ const PlantsList = () => {
                     {hasMore && (
                       <div className="text-center py-6">
                         <button
-                          onClick={loadMore}
-                          disabled={loading}
+                          onClick={loadMorePlants}
+                          disabled={loadingMore}
                           className="btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          {loading ? (
+                          {loadingMore ? (
                             <>
                               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2 inline-block"></div>
                               Loading...
@@ -275,7 +279,7 @@ const PlantsList = () => {
                         Failed to load more plants
                       </p>
                       <button
-                        onClick={retryLoad}
+                        onClick={loadPlants}
                         className="text-red-600 hover:text-red-800 text-sm font-medium"
                       >
                         Try Again
