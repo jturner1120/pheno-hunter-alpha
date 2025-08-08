@@ -17,6 +17,8 @@ import AnalyticsDashboard from './components/analytics/AnalyticsDashboard'
 import ReportGenerator from './components/reports/ReportGenerator'
 import PredictiveAnalytics from './components/predictions/PredictiveAnalytics'
 import NotFound from './components/NotFound'
+import SessionWarning from './components/SessionWarning'
+import SessionStatus from './components/SessionStatus'
 
 function App() {
   return (
@@ -85,6 +87,12 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+          
+          {/* Session Warning Modal - Shows globally when session is about to expire */}
+          <SessionWarning />
+          
+          {/* Debug: Session Status - Remove in production */}
+          <SessionStatus />
         </div>
       </Router>
     </AuthProvider>
