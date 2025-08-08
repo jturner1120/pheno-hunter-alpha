@@ -25,10 +25,10 @@ export const usePlantsListOptimized = () => {
   const [error, setError] = useState('');
   
   // Filter and search state
-  const [activeFilter, setActiveFilter] = useState(searchParams.get('filter') || 'active');
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'createdAt');
-  const [sortOrder, setSortOrder] = useState(searchParams.get('order') || 'desc');
+  const [activeFilter, setActiveFilter] = useState(searchParams?.get('filter') || 'active');
+  const [searchQuery, setSearchQuery] = useState(searchParams?.get('search') || '');
+  const [sortBy, setSortBy] = useState(searchParams?.get('sort') || 'createdAt');
+  const [sortOrder, setSortOrder] = useState(searchParams?.get('order') || 'desc');
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(0);
@@ -207,13 +207,15 @@ export const usePlantsListOptimized = () => {
     
     // Set new timeout for debounced search
     searchTimeoutRef.current = setTimeout(() => {
-      const newParams = new URLSearchParams(searchParams);
-      if (query) {
-        newParams.set('search', query);
-      } else {
-        newParams.delete('search');
+      if (searchParams) {
+        const newParams = new URLSearchParams(searchParams);
+        if (query) {
+          newParams.set('search', query);
+        } else {
+          newParams.delete('search');
+        }
+        setSearchParams(newParams);
       }
-      setSearchParams(newParams);
     }, SEARCH_DEBOUNCE_MS);
   }, [searchParams, setSearchParams]);
 
@@ -221,9 +223,11 @@ export const usePlantsListOptimized = () => {
   const handleFilterChange = useCallback((filterType) => {
     setActiveFilter(filterType);
     
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set('filter', filterType);
-    setSearchParams(newParams);
+    if (searchParams) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('filter', filterType);
+      setSearchParams(newParams);
+    }
     
     logInfo('Plants filter changed', { filter: filterType, userId: user?.id });
   }, [searchParams, setSearchParams, user?.id]);
@@ -233,10 +237,12 @@ export const usePlantsListOptimized = () => {
     setSortBy(newSortBy);
     setSortOrder(newSortOrder);
     
-    const newParams = new URLSearchParams(searchParams);
-    newParams.set('sort', newSortBy);
-    newParams.set('order', newSortOrder);
-    setSearchParams(newParams);
+    if (searchParams) {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.set('sort', newSortBy);
+      newParams.set('order', newSortOrder);
+      setSearchParams(newParams);
+    }
     
     logInfo('Plants sort changed', { 
       sortBy: newSortBy, 
