@@ -131,6 +131,7 @@ export const useBulkOperations = () => {
   }, []);
 
   const selectPlantsByFilter = useCallback((plants, filterFn) => {
+    if (!Array.isArray(plants)) return;
     const filteredIds = plants.filter(filterFn).map(p => p.id);
     setSelectedPlants(new Set(filteredIds));
   }, []);
@@ -150,6 +151,7 @@ export const useBulkOperations = () => {
 
   // Get selected plant data
   const getSelectedPlants = useCallback((allPlants) => {
+    if (!Array.isArray(allPlants)) return [];
     return allPlants.filter(plant => selectedPlants.has(plant.id));
   }, [selectedPlants]);
 

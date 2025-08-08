@@ -49,6 +49,9 @@ const SelectionStats = memo(({ count, total, onSelectAll, onClearAll }) => (
 SelectionStats.displayName = 'SelectionStats';
 
 const BulkActionBar = ({ plants, className = '' }) => {
+  // Ensure plants is always an array
+  const plantsArray = Array.isArray(plants) ? plants : [];
+  
   const {
     selectionCount,
     hasSelection,
@@ -69,7 +72,7 @@ const BulkActionBar = ({ plants, className = '' }) => {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [selectedOperation, setSelectedOperation] = useState(null);
 
-  const selectedPlantData = getSelectedPlants(plants);
+  const selectedPlantData = getSelectedPlants(plantsArray);
   const availableOperations = getAvailableOperations(selectedPlantData);
 
   // Quick actions that don't need input
@@ -95,11 +98,11 @@ const BulkActionBar = ({ plants, className = '' }) => {
     }
 
     try {
-      await executeOperation(operation, {}, plants);
+      await executeOperation(operation, {}, plantsArray);
     } catch (error) {
       console.error('Quick action failed:', error);
     }
-  }, [hasSelection, selectionCount, executeOperation, plants, OPERATION_CONFIGS]);
+  }, [hasSelection, selectionCount, executeOperation, plantsArray, OPERATION_CONFIGS]);
 
   const handleModalAction = useCallback((operation) => {
     setSelectedOperation(operation);
@@ -108,13 +111,13 @@ const BulkActionBar = ({ plants, className = '' }) => {
 
   const handleModalSubmit = useCallback(async (operation, inputData) => {
     try {
-      await executeOperation(operation, inputData, plants);
+      await executeOperation(operation, inputData, plantsArray);
       setShowBulkModal(false);
       setSelectedOperation(null);
     } catch (error) {
       console.error('Modal action failed:', error);
     }
-  }, [executeOperation, plants]);
+  }, [executeOperation, plantsArray]);
 
   const handleModalClose = useCallback(() => {
     setShowBulkModal(false);
@@ -122,8 +125,8 @@ const BulkActionBar = ({ plants, className = '' }) => {
   }, []);
 
   const handleSelectAll = useCallback(() => {
-    selectAllPlants(plants.map(p => p.id));
-  }, [selectAllPlants, plants]);
+    selectAllPlants(plantsArray.map(p => p.id));
+  }, [selectAllPlants, plantsArray]);
 
   const handleUndo = useCallback(async () => {
     try {
@@ -182,7 +185,7 @@ const BulkActionBar = ({ plants, className = '' }) => {
           <div className="flex items-center justify-between">
             <SelectionStats
               count={selectionCount}
-              total={plants.length}
+              total={plantsArray.length}
               onSelectAll={handleSelectAll}
               onClearAll={clearSelection}
             />

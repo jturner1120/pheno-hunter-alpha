@@ -90,9 +90,9 @@ const PlantsList = () => {
   }
 
   return (
-    <MultiSelectProvider plants={plants}>
+    <MultiSelectProvider plants={Array.isArray(plants) ? plants : []}>
       <div className="min-h-screen bg-patriot-gray">
-        <BulkActionBar />
+        <BulkActionBar plants={Array.isArray(plants) ? plants : []} />
         
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
