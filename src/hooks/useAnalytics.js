@@ -66,16 +66,6 @@ const useAnalytics = (timeRange = '30d', plantIds = []) => {
       setMetrics(metricsData || []);
       setTimeline(timelineData || []);
 
-      // Debug logging
-      console.log('Analytics Debug:', {
-        plantsLoaded: plantsData?.length || 0,
-        metricsLoaded: metricsData?.length || 0,
-        timelineLoaded: timelineData?.length || 0,
-        plants: plantsData,
-        metrics: metricsData,
-        timeline: timelineData
-      });
-
       logInfo('Analytics data loaded successfully', {
         plantsCount: plantsData?.length || 0,
         metricsCount: metricsData?.length || 0,
@@ -88,7 +78,7 @@ const useAnalytics = (timeRange = '30d', plantIds = []) => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, selectedTimeRange, selectedPlants.join(',')]); // Use join to create stable string comparison
+  }, [user?.id, selectedTimeRange]); // Simplified dependencies
 
   // Growth analytics calculations
   const growthAnalytics = useMemo(() => {
@@ -373,10 +363,12 @@ const useAnalytics = (timeRange = '30d', plantIds = []) => {
     setSelectedPlants(plantIds);
   }, []);
 
-  // Load data effect - stable dependencies
+  // Load data effect - simplified to prevent infinite loops
   useEffect(() => {
-    loadAnalyticsData();
-  }, [loadAnalyticsData]);
+    if (user?.id) {
+      loadAnalyticsData();
+    }
+  }, [user?.id, selectedTimeRange]); // Only reload when user or time range changes
 
   return {
     // State

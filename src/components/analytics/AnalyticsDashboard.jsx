@@ -41,19 +41,6 @@ const AnalyticsDashboard = () => {
     isEmpty
   } = useAnalytics();
 
-  // Debug logging
-  console.log('Analytics Dashboard State:', {
-    loading,
-    error,
-    isEmpty,
-    hasData,
-    plantsCount: plants?.length || 0,
-    growthAnalytics,
-    strainAnalytics,
-    timelineAnalytics,
-    chartData
-  });
-
   const handleViewChange = (view) => {
     setSelectedView(view);
   };
