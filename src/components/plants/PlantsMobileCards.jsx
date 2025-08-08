@@ -12,7 +12,7 @@ const PlantsMobileCards = ({
 }) => {
   const { selectedPlants, togglePlant, selectMode } = useMultiSelect();
 
-  const isSelected = (plantId) => selectedPlants.some(p => p.id === plantId);
+  const isSelected = (plantId) => selectedPlants.has(plantId);
 
   const handleCardClick = (plant, event) => {
     // Prevent card selection when clicking action buttons
@@ -21,7 +21,7 @@ const PlantsMobileCards = ({
     }
     
     if (selectMode) {
-      togglePlant(plant);
+      togglePlant(plant.id);
     }
   };
   return (
@@ -40,7 +40,7 @@ const PlantsMobileCards = ({
                 <input
                   type="checkbox"
                   checked={isSelected(plant.id)}
-                  onChange={() => togglePlant(plant)}
+                  onChange={() => togglePlant(plant.id)}
                   className="h-4 w-4 text-patriot-blue focus:ring-patriot-blue border-gray-300 rounded"
                   onClick={(e) => e.stopPropagation()}
                 />

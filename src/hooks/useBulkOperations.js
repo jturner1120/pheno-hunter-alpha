@@ -387,7 +387,8 @@ export const useBulkOperations = () => {
 
   // Get available operations for selected plants
   const getAvailableOperations = useCallback((selectedPlantData) => {
-    if (!selectedPlantData.length) return [];
+    // Ensure selectedPlantData is an array
+    if (!Array.isArray(selectedPlantData) || !selectedPlantData.length) return [];
 
     const operations = Object.keys(BULK_OPERATIONS);
     
@@ -416,7 +417,7 @@ export const useBulkOperations = () => {
 
   return {
     // Selection state
-    selectedPlants,
+    selectedPlants, // Keep as Set for ID checking
     isSelectionMode,
     selectionCount,
     hasSelection,
@@ -429,6 +430,7 @@ export const useBulkOperations = () => {
 
     // Selection actions
     togglePlantSelection,
+    togglePlant: togglePlantSelection, // Alias for backward compatibility
     selectAllPlants,
     selectPlantsByFilter,
     clearSelection,

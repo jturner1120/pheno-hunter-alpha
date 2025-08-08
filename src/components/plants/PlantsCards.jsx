@@ -12,7 +12,7 @@ const PlantsTable = ({
 }) => {
   const { selectedPlants, togglePlant, selectMode } = useMultiSelect();
 
-  const isSelected = (plantId) => selectedPlants.some(p => p.id === plantId);
+  const isSelected = (plantId) => selectedPlants.has(plantId);
 
   const handleRowClick = (plant, event) => {
     // Prevent row selection when clicking action buttons
@@ -21,7 +21,7 @@ const PlantsTable = ({
     }
     
     if (selectMode) {
-      togglePlant(plant);
+      togglePlant(plant.id);
     }
   };
   return (
