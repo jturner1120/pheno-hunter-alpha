@@ -66,6 +66,16 @@ const useAnalytics = (timeRange = '30d', plantIds = []) => {
       setMetrics(metricsData || []);
       setTimeline(timelineData || []);
 
+      // Debug logging
+      console.log('Analytics Debug:', {
+        plantsLoaded: plantsData?.length || 0,
+        metricsLoaded: metricsData?.length || 0,
+        timelineLoaded: timelineData?.length || 0,
+        plants: plantsData,
+        metrics: metricsData,
+        timeline: timelineData
+      });
+
       logInfo('Analytics data loaded successfully', {
         plantsCount: plantsData?.length || 0,
         metricsCount: metricsData?.length || 0,
