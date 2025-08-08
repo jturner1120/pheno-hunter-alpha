@@ -13,6 +13,9 @@ import Dashboard from './components/Dashboard'
 import PlantForm from './components/plants/PlantForm'
 import PlantsList from './components/plants/PlantsList'
 import PlantDetail from './components/plants/PlantDetail'
+import AnalyticsDashboard from './components/analytics/AnalyticsDashboard'
+import ReportGenerator from './components/reports/ReportGenerator'
+import PredictiveAnalytics from './components/predictions/PredictiveAnalytics'
 import NotFound from './components/NotFound'
 
 function App() {
@@ -52,6 +55,30 @@ function App() {
               element={
                 <ProtectedRoute>
                   <PlantDetail />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/analytics" 
+              element={
+                <ProtectedRoute>
+                  <AnalyticsDashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/reports" 
+              element={
+                <ProtectedRoute>
+                  <ReportGenerator />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/predictions" 
+              element={
+                <ProtectedRoute>
+                  <PredictiveAnalytics />
                 </ProtectedRoute>
               } 
             />

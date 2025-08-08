@@ -1,456 +1,295 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import { getUserPlants, getPlantStats } from '../../utils/firestore';
-import billyBong from '../../assets/billy.png';
+import React, { useState, useCallback, useMemo } from 'react';
+import { usePlantsListOptimized } from '../../hooks/usePlantsListOptimized';
+import PlantsSearchAndFilters from './PlantsSearchAndFilters';
+import PlantsStatsFilters from './PlantsStatsFilters';
+import PlantsVirtualizedList from './PlantsVirtualizedList';
+import PlantsTable from './PlantsCards';
+import PlantsMobileCards from './PlantsMobileCards';
+import PlantsEmptyState from './PlantsEmptyState';
+import { PlantsLoadingState, PlantsErrorState } from './PlantsStates';
+import MultiSelectProvider from './bulk/MultiSelectProvider';
+import BulkActionBar from './bulk/BulkActionBar';
+import BulkEditModal from './bulk/BulkEditModal';
+import ProgressTracker from './bulk/ProgressTracker';
 
 const PlantsList = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const [plants, setPlants] = useState([]);
-  const [stats, setStats] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [activeFilter, setActiveFilter] = useState('active'); // 'all', 'active', 'harvested', 'clones'
-
-  useEffect(() => {
-    if (user) {
-      loadPlants();
-    }
-  }, [user]);
-
-  const loadPlants = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      
-      const [plantsData, statsData] = await Promise.all([
-        getUserPlants(user.id),
-        getPlantStats(user.id)
-      ]);
-      
-      setPlants(plantsData);
-      setStats(statsData);
-    } catch (error) {
-      console.error('Error loading plants:', error);
-      setError('Failed to load plants. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatDate = (dateField) => {
-    if (!dateField) return 'N/A';
+  // Local state for view preferences
+  const [viewMode, setViewMode] = useState('auto'); // 'auto', 'table', 'cards', 'virtualized'
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  
+  const {
+    // State
+    plants,
+    filteredPlants,
+    totalCount,
+    stats,
+    loading,
+    error,
     
-    // Handle Firestore timestamp
-    let date;
-    if (dateField.toDate) {
-      date = dateField.toDate();
-    } else if (typeof dateField === 'string') {
-      date = new Date(dateField);
-    } else {
-      date = dateField;
-    }
+    // Search & Filters
+    searchTerm,
+    activeFilter,
+    sortBy,
+    sortOrder,
     
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  const getStatusBadge = (plant) => {
-    const status = plant.status || (plant.harvested ? 'harvested' : 'active');
+    // Pagination
+    currentPage,
+    pageSize,
+    hasMore,
     
-    const statusConfig = {
-      seedling: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Seedling' },
-      vegetative: { bg: 'bg-green-100', text: 'text-green-800', label: 'Vegetative' },
-      flowering: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Flowering' },
-      harvested: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'Harvested' },
-      active: { bg: 'bg-green-100', text: 'text-green-800', label: 'Active' }
-    };
+    // Actions
+    handleSearch,
+    handleFilterChange,
+    handleSortChange,
+    handleView,
+    handleClone,
+    handleHarvest,
+    handleAddPlant,
+    handleBackToDashboard,
+    loadMore,
+    retryLoad,
     
-    const config = statusConfig[status] || statusConfig.active;
+    // Utilities
+    formatDate,
+    getStatusBadge
+  } = usePlantsListOptimized();
+
+  // Determine optimal view mode
+  const optimalViewMode = useMemo(() => {
+    if (viewMode !== 'auto') return viewMode;
     
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-        {config.label}
-      </span>
-    );
-  };
+    // Auto-select based on data size and screen
+    const isLargeDataset = totalCount > 100;
+    const isMobile = window.innerWidth < 768;
+    
+    if (isLargeDataset) return 'virtualized';
+    if (isMobile) return 'cards';
+    return 'table';
+  }, [viewMode, totalCount]);
 
-  const handleView = (plantId) => {
-    navigate(`/plants/${plantId}`);
-  };
+  // Memoized handlers
+  const handleViewModeChange = useCallback((mode) => {
+    setViewMode(mode);
+  }, []);
 
-  const handleClone = (plant) => {
-    navigate(`/plants/${plant.id}`);
-  };
+  const handleToggleAdvancedFilters = useCallback(() => {
+    setShowAdvancedFilters(prev => !prev);
+  }, []);
 
-  const handleHarvest = (plant) => {
-    navigate(`/plants/${plant.id}`);
-  };
-
-  const getFilteredPlants = () => {
-    switch (activeFilter) {
-      case 'all':
-        return plants.filter(p => p.status !== 'harvested' && !p.harvested);
-      case 'active':
-        return plants.filter(p => p.status !== 'harvested' && !p.harvested);
-      case 'harvested':
-        return plants.filter(p => p.status === 'harvested' || p.harvested);
-      case 'clones':
-        return plants.filter(p => p.isClone || p.origin === 'Clone');
-      default:
-        return plants.filter(p => p.status !== 'harvested' && !p.harvested);
-    }
-  };
-
-  const handleFilterClick = (filterType) => {
-    setActiveFilter(filterType);
-  };
-
-  const filteredPlants = getFilteredPlants();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-patriot-gray flex items-center justify-center">
-        <div className="card">
-          <div className="flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-patriot-blue"></div>
-            <span className="text-patriot-navy">Loading plants...</span>
-          </div>
-        </div>
-      </div>
-    );
+  if (loading && !plants.length) {
+    return <PlantsLoadingState />;
   }
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-patriot-gray flex items-center justify-center">
-        <div className="card max-w-md">
-          <div className="text-center">
-            <div className="text-red-500 text-4xl mb-4">⚠️</div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Plants</h3>
-            <p className="text-gray-600 mb-4">{error}</p>
-            <button 
-              onClick={loadPlants}
-              className="btn-primary"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+  if (error && !plants.length) {
+    return <PlantsErrorState error={error} onRetry={retryLoad} />;
   }
 
   return (
-    <div className="min-h-screen bg-patriot-gray">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <button 
-                onClick={() => navigate('/dashboard')}
-                className="text-patriot-blue hover:text-blue-700 mr-4"
-              >
-                ← Back to Dashboard
-              </button>
-              <h1 className="text-xl font-bold text-patriot-navy">Your Plants</h1>
+    <MultiSelectProvider plants={plants}>
+      <div className="min-h-screen bg-patriot-gray">
+        <BulkActionBar />
+        
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center">
+                <button 
+                  onClick={handleBackToDashboard}
+                  className="text-patriot-blue hover:text-blue-700 mr-4"
+                  aria-label="Back to Dashboard"
+                >
+                  ← Back to Dashboard
+                </button>
+                <h1 className="text-xl font-bold text-patriot-navy">Your Plants</h1>
+                {totalCount > 0 && (
+                  <span className="ml-2 text-sm text-gray-500">
+                    ({totalCount} total)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center space-x-3">
+                {/* View Mode Toggle */}
+                {totalCount > 20 && (
+                  <div className="hidden md:flex items-center space-x-1 bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => handleViewModeChange('table')}
+                      className={`px-3 py-1 text-xs rounded ${optimalViewMode === 'table' ? 'bg-white shadow-sm' : 'text-gray-600'}`}
+                      title="Table View"
+                    >
+                      Table
+                    </button>
+                    <button
+                      onClick={() => handleViewModeChange('virtualized')}
+                      className={`px-3 py-1 text-xs rounded ${optimalViewMode === 'virtualized' ? 'bg-white shadow-sm' : 'text-gray-600'}`}
+                      title="List View (Virtualized)"
+                    >
+                      List
+                    </button>
+                  </div>
+                )}
+                
+                <button 
+                  onClick={handleAddPlant}
+                  className="btn-primary"
+                >
+                  + Add Plant
+                </button>
+              </div>
             </div>
-            <button 
-              onClick={() => navigate('/plant')}
-              className="btn-primary"
-            >
-              + Add Plant
-            </button>
           </div>
-        </div>
-      </header>
+        </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto p-6">
-        {plants.length === 0 ? (
-          // Empty State
-          <div className="text-center py-12">
-            <div className="w-32 h-32 mx-auto mb-6">
-              <img 
-                src={billyBong} 
-                alt="Billy Bong" 
-                className="w-full h-full object-contain"
-              />
-            </div>
-            <h3 className="text-xl font-semibold text-patriot-navy mb-2">
-              No plants yet!
-            </h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              Billy's excited to help you start your growing journey! Add your first plant to get started.
-            </p>
-            <button 
-              onClick={() => navigate('/plant')}
-              className="btn-primary"
-            >
-              Add Your First Plant
-            </button>
-          </div>
+        {plants.length === 0 && !loading ? (
+          <PlantsEmptyState 
+            activeFilter="all"
+            onAddPlant={handleAddPlant}
+          />
         ) : (
-          // Plants Table/Cards
           <div className="space-y-6">
-            {/* Summary Stats - Now Clickable Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <button
-                onClick={() => handleFilterClick('all')}
-                className={`bg-white rounded-lg p-4 shadow-sm text-left transition-all hover:shadow-md ${
-                  activeFilter === 'all' ? 'ring-2 ring-patriot-blue bg-blue-50' : ''
-                }`}
-              >
-                <div className="text-2xl font-bold text-patriot-navy">{stats.totalPlants || plants.length}</div>
-                <div className="text-sm text-gray-600">Total Plants</div>
-              </button>
-              <button
-                onClick={() => handleFilterClick('active')}
-                className={`bg-white rounded-lg p-4 shadow-sm text-left transition-all hover:shadow-md ${
-                  activeFilter === 'active' ? 'ring-2 ring-green-500 bg-green-50' : ''
-                }`}
-              >
-                <div className="text-2xl font-bold text-green-600">
-                  {stats.activePlants || plants.filter(p => p.status !== 'harvested' && !p.harvested).length}
-                </div>
-                <div className="text-sm text-gray-600">Active</div>
-              </button>
-              <button
-                onClick={() => handleFilterClick('harvested')}
-                className={`bg-white rounded-lg p-4 shadow-sm text-left transition-all hover:shadow-md ${
-                  activeFilter === 'harvested' ? 'ring-2 ring-gray-500 bg-gray-50' : ''
-                }`}
-              >
-                <div className="text-2xl font-bold text-gray-600">
-                  {stats.harvestedPlants || plants.filter(p => p.status === 'harvested' || p.harvested).length}
-                </div>
-                <div className="text-sm text-gray-600">Harvested</div>
-              </button>
-              <button
-                onClick={() => handleFilterClick('clones')}
-                className={`bg-white rounded-lg p-4 shadow-sm text-left transition-all hover:shadow-md ${
-                  activeFilter === 'clones' ? 'ring-2 ring-patriot-blue bg-blue-50' : ''
-                }`}
-              >
-                <div className="text-2xl font-bold text-patriot-blue">
-                  {stats.totalClones || plants.filter(p => p.isClone || p.origin === 'Clone').length}
-                </div>
-                <div className="text-sm text-gray-600">Clones</div>
-              </button>
-            </div>
+            {/* Search and Filters */}
+            <PlantsSearchAndFilters
+              searchTerm={searchTerm}
+              onSearchChange={handleSearch}
+              activeFilter={activeFilter}
+              onFilterChange={handleFilterChange}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+              totalResults={filteredPlants.length}
+              totalCount={totalCount}
+              showAdvancedFilters={showAdvancedFilters}
+              onToggleAdvancedFilters={handleToggleAdvancedFilters}
+            />
 
-            {/* Show filtered plants or empty state */}
-            {filteredPlants.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-32 h-32 mx-auto mb-6">
-                  <img 
-                    src={billyBong} 
-                    alt="Billy Bong" 
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-                <h3 className="text-xl font-semibold text-patriot-navy mb-2">
-                  No {activeFilter === 'all' ? 'active' : activeFilter} plants found
-                </h3>
-                <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                  {activeFilter === 'harvested' 
-                    ? "You haven't harvested any plants yet."
-                    : activeFilter === 'clones'
-                    ? "You haven't created any clones yet."
-                    : "No plants match the current filter."
-                  }
-                </p>
-                {activeFilter !== 'harvested' && (
-                  <button 
-                    onClick={() => navigate('/plant')}
-                    className="btn-primary"
-                  >
-                    Add a Plant
-                  </button>
-                )}
-              </div>
+            {/* Summary Stats - Clickable Filters */}
+            <PlantsStatsFilters 
+              stats={stats}
+              plants={plants}
+              activeFilter={activeFilter}
+              onFilterChange={handleFilterChange}
+            />
+
+            {/* Results Section */}
+            {filteredPlants.length === 0 && !loading ? (
+              <PlantsEmptyState 
+                activeFilter={activeFilter}
+                onAddPlant={handleAddPlant}
+                showAddButton={activeFilter !== 'harvested'}
+                searchTerm={searchTerm}
+              />
             ) : (
               <>
-            {/* Desktop Table */}
-            <div className="hidden md:block card p-0 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Plant
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Strain
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        UID
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Origin
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Date
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Generation
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredPlants.map((plant) => (
-                      <tr key={plant.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {(plant.imageUrl || plant.image) ? (
-                              <img
-                                src={plant.imageUrl || plant.image}
-                                alt={plant.name}
-                                className="h-10 w-10 rounded-full object-cover mr-3"
-                              />
-                            ) : (
-                              <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center mr-3">
-                                <span className="text-gray-500 text-sm">🌱</span>
-                              </div>
-                            )}
-                            <div className="text-sm font-medium text-gray-900">
-                              {plant.name}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plant.strain}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plant.uid ? (
-                            <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                              {plant.uid}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 text-xs">No UID</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plant.origin || (plant.isClone ? 'Clone' : 'Seed') === 'Seed' ? '🌰' : '🌿'} {plant.origin || (plant.isClone ? 'Clone' : 'Seed')}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(plant.plantedDate || plant.datePlanted)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          Gen {(plant.cloneGeneration || 0) + 1}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          {getStatusBadge(plant)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                          <button
-                            onClick={() => handleView(plant.id)}
-                            className="text-patriot-blue hover:text-blue-700"
-                          >
-                            View
-                          </button>
-                          {!plant.harvested && plant.status !== 'harvested' && (
-                            <>
-                              <button
-                                onClick={() => handleClone(plant)}
-                                className="text-patriot-red hover:text-red-700"
-                              >
-                                Clone
-                              </button>
-                              <button
-                                onClick={() => handleHarvest(plant)}
-                                className="text-gray-600 hover:text-gray-800"
-                              >
-                                Harvest
-                              </button>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                {/* Virtualized List for Large Datasets */}
+                {optimalViewMode === 'virtualized' && (
+                  <PlantsVirtualizedList
+                    plants={filteredPlants}
+                    onView={handleView}
+                    onClone={handleClone}
+                    onHarvest={handleHarvest}
+                    formatDate={formatDate}
+                    getStatusBadge={getStatusBadge}
+                    onLoadMore={loadMore}
+                    hasMore={hasMore}
+                    loading={loading}
+                    height={600}
+                    enableVirtualization={true}
+                  />
+                )}
 
-            {/* Mobile Cards */}
-            <div className="md:hidden space-y-4">
-              {filteredPlants.map((plant) => (
-                <div key={plant.id} className="card">
-                  <div className="flex items-start space-x-4">
-                    {(plant.imageUrl || plant.image) ? (
-                      <img
-                        src={plant.imageUrl || plant.image}
-                        alt={plant.name}
-                        className="h-16 w-16 rounded-lg object-cover"
-                      />
-                    ) : (
-                      <div className="h-16 w-16 rounded-lg bg-gray-200 flex items-center justify-center">
-                        <span className="text-gray-500 text-2xl">🌱</span>
+                {/* Desktop Table */}
+                {optimalViewMode === 'table' && (
+                  <div className="hidden md:block">
+                    <PlantsTable 
+                      plants={filteredPlants}
+                      onView={handleView}
+                      onClone={handleClone}
+                      onHarvest={handleHarvest}
+                      formatDate={formatDate}
+                      getStatusBadge={getStatusBadge}
+                    />
+                    
+                    {/* Load More for Table View */}
+                    {hasMore && (
+                      <div className="text-center py-6">
+                        <button
+                          onClick={loadMore}
+                          disabled={loading}
+                          className="btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {loading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2 inline-block"></div>
+                              Loading...
+                            </>
+                          ) : (
+                            'Load More Plants'
+                          )}
+                        </button>
                       </div>
                     )}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900 truncate">
-                          {plant.name}
-                        </h3>
-                        {getStatusBadge(plant)}
-                      </div>
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <p><span className="font-medium">Strain:</span> {plant.strain}</p>
-                        {plant.uid && (
-                          <p><span className="font-medium">UID:</span> <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{plant.uid}</span></p>
-                        )}
-                        <p><span className="font-medium">Origin:</span> {plant.origin || (plant.isClone ? 'Clone' : 'Seed') === 'Seed' ? '🌰' : '🌿'} {plant.origin || (plant.isClone ? 'Clone' : 'Seed')}</p>
-                        <p><span className="font-medium">Planted:</span> {formatDate(plant.plantedDate || plant.datePlanted)}</p>
-                        <p><span className="font-medium">Generation:</span> {(plant.cloneGeneration || 0) + 1}</p>
-                      </div>
-                      <div className="mt-4 flex space-x-3">
+                  </div>
+                )}
+
+                {/* Mobile Cards */}
+                {(optimalViewMode === 'cards' || optimalViewMode === 'table') && (
+                  <div className="md:hidden">
+                    <PlantsMobileCards 
+                      plants={filteredPlants}
+                      onView={handleView}
+                      onClone={handleClone}
+                      onHarvest={handleHarvest}
+                      formatDate={formatDate}
+                      getStatusBadge={getStatusBadge}
+                    />
+                    
+                    {/* Load More for Mobile */}
+                    {hasMore && (
+                      <div className="text-center py-6">
                         <button
-                          onClick={() => handleView(plant.id)}
-                          className="text-patriot-blue hover:text-blue-700 text-sm font-medium"
+                          onClick={loadMore}
+                          disabled={loading}
+                          className="btn-outline disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                          View Details
+                          {loading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2 inline-block"></div>
+                              Loading...
+                            </>
+                          ) : (
+                            'Load More Plants'
+                          )}
                         </button>
-                        {!plant.harvested && plant.status !== 'harvested' && (
-                          <>
-                            <button
-                              onClick={() => handleClone(plant)}
-                              className="text-patriot-red hover:text-red-700 text-sm font-medium"
-                            >
-                              Clone
-                            </button>
-                            <button
-                              onClick={() => handleHarvest(plant)}
-                              className="text-gray-600 hover:text-gray-800 text-sm font-medium"
-                            >
-                              Harvest
-                            </button>
-                          </>
-                        )}
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Error State for Load More */}
+                {error && plants.length > 0 && (
+                  <div className="text-center py-4">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4 inline-block">
+                      <p className="text-red-700 text-sm mb-2">
+                        Failed to load more plants
+                      </p>
+                      <button
+                        onClick={retryLoad}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                      >
+                        Try Again
+                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
               </>
             )}
           </div>
         )}
       </main>
     </div>
+    </MultiSelectProvider>
   );
 };
 

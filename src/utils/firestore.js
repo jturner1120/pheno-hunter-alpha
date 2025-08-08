@@ -10,6 +10,7 @@ import {
   query, 
   where, 
   orderBy, 
+  onSnapshot,
   serverTimestamp 
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
@@ -338,4 +339,357 @@ export default {
   addHarvestRecord,
   clonePlant,
   getPlantStats
+};
+
+// Export the new service for lifecycle management
+export const firestoreService = {
+  // Document operations
+  async getDocument(collection, id) {
+    try {
+      const docRef = doc(db, collection, id);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        return { id: docSnap.id, ...docSnap.data() };
+      } else {
+        throw new Error(`Document ${id} not found in ${collection}`);
+      }
+    } catch (error) {
+      logError(error, { operation: 'getDocument', collection, id });
+      throw error;
+    }
+  },
+
+  async updateDocument(collection, id, data) {
+    try {
+      const docRef = doc(db, collection, id);
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      });
+      logInfo(`Document updated: ${collection}/${id}`);
+    } catch (error) {
+      logError(error, { operation: 'updateDocument', collection, id });
+      throw error;
+    }
+  },
+
+  // Subcollection operations
+  async getSubcollection(parentCollection, parentId, subcollection) {
+    try {
+      const subcollectionRef = collection(db, parentCollection, parentId, subcollection);
+      const querySnapshot = await getDocs(subcollectionRef);
+      
+      const docs = [];
+      querySnapshot.forEach((doc) => {
+        docs.push({ id: doc.id, ...doc.data() });
+      });
+      
+      return docs;
+    } catch (error) {
+      logError(error, { operation: 'getSubcollection', parentCollection, parentId, subcollection });
+      throw error;
+    }
+  },
+
+  async addToSubcollection(parentCollection, parentId, subcollection, data) {
+    try {
+      const subcollectionRef = collection(db, parentCollection, parentId, subcollection);
+      const docRef = await addDoc(subcollectionRef, {
+        ...data,
+        createdAt: serverTimestamp()
+      });
+      
+      logInfo(`Document added to subcollection: ${parentCollection}/${parentId}/${subcollection}/${docRef.id}`);
+      return docRef.id;
+    } catch (error) {
+      logError(error, { operation: 'addToSubcollection', parentCollection, parentId, subcollection });
+      throw error;
+    }
+  },
+
+  // Collection subscription for real-time updates
+  subscribeToCollection(collectionName, callback, constraints = []) {
+    try {
+      const collectionRef = collection(db, collectionName);
+      let q = collectionRef;
+      
+      // Apply constraints if provided
+      if (constraints.length > 0) {
+        q = query(collectionRef, ...constraints);
+      }
+      
+      // Subscribe to real-time updates
+      const unsubscribe = onSnapshot(q, 
+        (querySnapshot) => {
+          const docs = [];
+          querySnapshot.forEach((doc) => {
+            docs.push({ id: doc.id, ...doc.data() });
+          });
+          callback(docs, null);
+        },
+        (error) => {
+          logError(error, { operation: 'subscribeToCollection', collectionName });
+          callback(null, error);
+        }
+      );
+      
+      return unsubscribe;
+    } catch (error) {
+      logError(error, { operation: 'subscribeToCollection', collectionName });
+      throw error;
+    }
+  },
+
+  unsubscribe(unsubscribeFunction) {
+    if (typeof unsubscribeFunction === 'function') {
+      unsubscribeFunction();
+    }
+  }
+};
+
+/**
+ * Get plant metrics for analytics
+ * @param {string} userId - User ID
+ * @param {Object} options - Query options
+ * @returns {Promise<Array>} - Array of metrics
+ */
+export const getPlantMetrics = async (userId, options = {}) => {
+  try {
+    const startTime = performance.now();
+    
+    const { plantIds, startDate, endDate } = options;
+    
+    // If specific plants are requested, get metrics for each
+    if (plantIds && plantIds.length > 0) {
+      const allMetrics = [];
+      
+      for (const plantId of plantIds) {
+        const metricsCollection = collection(db, 'users', userId, 'plants', plantId, 'metrics');
+        let q = metricsCollection;
+        
+        const constraints = [orderBy('timestamp', 'asc')];
+        
+        if (startDate) {
+          constraints.push(where('timestamp', '>=', startDate));
+        }
+        if (endDate) {
+          constraints.push(where('timestamp', '<=', endDate));
+        }
+        
+        if (constraints.length > 0) {
+          q = query(metricsCollection, ...constraints);
+        }
+        
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((doc) => {
+          allMetrics.push({
+            id: doc.id,
+            plantId,
+            ...doc.data()
+          });
+        });
+      }
+      
+      logPerformance('getPlantMetrics', performance.now() - startTime, { 
+        userId, 
+        plantCount: plantIds.length,
+        metricsCount: allMetrics.length 
+      });
+      
+      return allMetrics;
+    }
+    
+    // Get metrics for all plants
+    const plantsCollection = getUserPlantsCollection(userId);
+    const plantsSnapshot = await getDocs(plantsCollection);
+    const allMetrics = [];
+    
+    for (const plantDoc of plantsSnapshot.docs) {
+      const plantId = plantDoc.id;
+      const metricsCollection = collection(db, 'users', userId, 'plants', plantId, 'metrics');
+      let q = metricsCollection;
+      
+      const constraints = [orderBy('timestamp', 'asc')];
+      
+      if (startDate) {
+        constraints.push(where('timestamp', '>=', startDate));
+      }
+      if (endDate) {
+        constraints.push(where('timestamp', '<=', endDate));
+      }
+      
+      if (constraints.length > 0) {
+        q = query(metricsCollection, ...constraints);
+      }
+      
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        allMetrics.push({
+          id: doc.id,
+          plantId,
+          ...doc.data()
+        });
+      });
+    }
+    
+    logPerformance('getPlantMetrics', performance.now() - startTime, { 
+      userId, 
+      metricsCount: allMetrics.length 
+    });
+    
+    return allMetrics;
+  } catch (error) {
+    logError(error, { operation: 'getPlantMetrics', userId, options });
+    throw error;
+  }
+};
+
+/**
+ * Get plant timeline events for analytics
+ * @param {string} userId - User ID
+ * @param {Object} options - Query options
+ * @returns {Promise<Array>} - Array of timeline events
+ */
+export const getPlantTimeline = async (userId, options = {}) => {
+  try {
+    const startTime = performance.now();
+    
+    const { plantIds, startDate, endDate } = options;
+    
+    // If specific plants are requested, get timeline for each
+    if (plantIds && plantIds.length > 0) {
+      const allEvents = [];
+      
+      for (const plantId of plantIds) {
+        const timelineCollection = collection(db, 'users', userId, 'plants', plantId, 'timeline');
+        let q = timelineCollection;
+        
+        const constraints = [orderBy('timestamp', 'desc')];
+        
+        if (startDate) {
+          constraints.push(where('timestamp', '>=', startDate));
+        }
+        if (endDate) {
+          constraints.push(where('timestamp', '<=', endDate));
+        }
+        
+        if (constraints.length > 0) {
+          q = query(timelineCollection, ...constraints);
+        }
+        
+        const querySnapshot = await getDocs(q);
+        querySnapshot.forEach((doc) => {
+          allEvents.push({
+            id: doc.id,
+            plantId,
+            ...doc.data()
+          });
+        });
+      }
+      
+      logPerformance('getPlantTimeline', performance.now() - startTime, { 
+        userId, 
+        plantCount: plantIds.length,
+        eventsCount: allEvents.length 
+      });
+      
+      return allEvents;
+    }
+    
+    // Get timeline events for all plants
+    const plantsCollection = getUserPlantsCollection(userId);
+    const plantsSnapshot = await getDocs(plantsCollection);
+    const allEvents = [];
+    
+    for (const plantDoc of plantsSnapshot.docs) {
+      const plantId = plantDoc.id;
+      const timelineCollection = collection(db, 'users', userId, 'plants', plantId, 'timeline');
+      let q = timelineCollection;
+      
+      const constraints = [orderBy('timestamp', 'desc')];
+      
+      if (startDate) {
+        constraints.push(where('timestamp', '>=', startDate));
+      }
+      if (endDate) {
+        constraints.push(where('timestamp', '<=', endDate));
+      }
+      
+      if (constraints.length > 0) {
+        q = query(timelineCollection, ...constraints);
+      }
+      
+      const querySnapshot = await getDocs(q);
+      querySnapshot.forEach((doc) => {
+        allEvents.push({
+          id: doc.id,
+          plantId,
+          ...doc.data()
+        });
+      });
+    }
+    
+    logPerformance('getPlantTimeline', performance.now() - startTime, { 
+      userId, 
+      eventsCount: allEvents.length 
+    });
+    
+    return allEvents;
+  } catch (error) {
+    logError(error, { operation: 'getPlantTimeline', userId, options });
+    throw error;
+  }
+};
+
+/**
+ * Record plant metrics
+ * @param {string} userId - User ID
+ * @param {string} plantId - Plant ID
+ * @param {Object} metrics - Metrics data
+ * @returns {Promise<string>} - Created metrics record ID
+ */
+export const recordPlantMetrics = async (userId, plantId, metrics) => {
+  try {
+    const metricsCollection = collection(db, 'users', userId, 'plants', plantId, 'metrics');
+    const metricsData = {
+      ...metrics,
+      timestamp: serverTimestamp(),
+      recordedBy: userId
+    };
+    
+    const docRef = await addDoc(metricsCollection, metricsData);
+    
+    logInfo(`Metrics recorded for plant ${plantId}`, { userId, plantId, metricsId: docRef.id });
+    return docRef.id;
+  } catch (error) {
+    logError(error, { operation: 'recordPlantMetrics', userId, plantId });
+    throw error;
+  }
+};
+
+/**
+ * Add timeline event
+ * @param {string} userId - User ID
+ * @param {string} plantId - Plant ID
+ * @param {Object} event - Event data
+ * @returns {Promise<string>} - Created event ID
+ */
+export const addTimelineEvent = async (userId, plantId, event) => {
+  try {
+    const timelineCollection = collection(db, 'users', userId, 'plants', plantId, 'timeline');
+    const eventData = {
+      ...event,
+      timestamp: serverTimestamp(),
+      userId
+    };
+    
+    const docRef = await addDoc(timelineCollection, eventData);
+    
+    logInfo(`Timeline event added for plant ${plantId}`, { userId, plantId, eventId: docRef.id, type: event.type });
+    return docRef.id;
+  } catch (error) {
+    logError(error, { operation: 'addTimelineEvent', userId, plantId });
+    throw error;
+  }
 };
