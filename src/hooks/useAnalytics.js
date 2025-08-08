@@ -16,15 +16,15 @@ const useAnalytics = (timeRange = '30d', plantIds = []) => {
   const [selectedTimeRange, setSelectedTimeRange] = useState(timeRange);
   const [selectedPlants, setSelectedPlants] = useState(plantIds);
 
-  // Time range options
-  const timeRangeOptions = [
+  // Time range options - memoized to prevent infinite re-renders
+  const timeRangeOptions = useMemo(() => [
     { value: '7d', label: '7 Days', days: 7 },
     { value: '30d', label: '30 Days', days: 30 },
     { value: '90d', label: '3 Months', days: 90 },
     { value: '6m', label: '6 Months', days: 180 },
     { value: '1y', label: '1 Year', days: 365 },
     { value: 'all', label: 'All Time', days: null }
-  ];
+  ], []);
 
   // Load analytics data
   const loadAnalyticsData = useCallback(async () => {
@@ -88,7 +88,7 @@ const useAnalytics = (timeRange = '30d', plantIds = []) => {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, selectedTimeRange, selectedPlants, timeRangeOptions]);
+  }, [user?.id, selectedTimeRange, selectedPlants.join(',')]); // Use join to create stable string comparison
 
   // Growth analytics calculations
   const growthAnalytics = useMemo(() => {
@@ -373,7 +373,7 @@ const useAnalytics = (timeRange = '30d', plantIds = []) => {
     setSelectedPlants(plantIds);
   }, []);
 
-  // Load data effect
+  // Load data effect - stable dependencies
   useEffect(() => {
     loadAnalyticsData();
   }, [loadAnalyticsData]);
