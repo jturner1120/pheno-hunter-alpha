@@ -1,13 +1,6 @@
 // src/hooks/useDashboard.js
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate }   // Recent plants (last 5 active plants)
-  const recentPlants = Array.isArray(plants) ? plants
-    .filter(plant => plant.status !== 'harvested' && !plant.harvested)
-    .sort((a, b) => {
-      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-      return dateB - dateA;
-    })act-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { getUserPlants, getPlantStats } from '../utils/firestore';
 import { logInfo, logError } from '../utils/logger';
