@@ -16,7 +16,7 @@ export const usePlantsListOptimized = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Core state
+  // Core state - ensure all arrays are initialized
   const [allPlants, setAllPlants] = useState([]);
   const [displayedPlants, setDisplayedPlants] = useState([]);
   const [stats, setStats] = useState({});
@@ -89,7 +89,8 @@ export const usePlantsListOptimized = () => {
   const processedPlants = useMemo(() => {
     const startTime = performance.now();
     
-    let filtered = allPlants;
+    // Ensure allPlants is always an array
+    let filtered = Array.isArray(allPlants) ? allPlants : [];
     
     // Apply filter
     const filterFn = filterFunctions[activeFilter] || filterFunctions.all;
@@ -107,7 +108,7 @@ export const usePlantsListOptimized = () => {
     const duration = performance.now() - startTime;
     if (duration > 10) { // Only log if processing takes > 10ms
       logPerformance('plants_list_processing', duration, {
-        totalPlants: allPlants.length,
+        totalPlants: Array.isArray(allPlants) ? allPlants.length : 0,
         filteredPlants: filtered.length,
         filter: activeFilter,
         search: searchQuery ? 'yes' : 'no',
@@ -158,7 +159,7 @@ export const usePlantsListOptimized = () => {
 
   // Pagination - load more plants
   const loadMorePlants = useCallback(() => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || !Array.isArray(processedPlants)) return;
     
     setLoadingMore(true);
     
@@ -166,7 +167,7 @@ export const usePlantsListOptimized = () => {
     const endIndex = Math.min(startIndex + LOAD_MORE_SIZE, processedPlants.length);
     const newPlants = processedPlants.slice(startIndex, endIndex);
     
-    setDisplayedPlants(prev => [...prev, ...newPlants]);
+    setDisplayedPlants(prev => [...(prev || []), ...newPlants]);
     setCurrentPage(prev => prev + 1);
     setHasMore(endIndex < processedPlants.length);
     
@@ -320,10 +321,10 @@ export const usePlantsListOptimized = () => {
   const shouldUseVirtualization = processedPlants.length > VIRTUALIZATION_THRESHOLD;
 
   return {
-    // State
-    plants: allPlants,
-    displayedPlants,
-    stats,
+    // State - ensure arrays are never undefined
+    plants: Array.isArray(allPlants) ? allPlants : [],
+    displayedPlants: Array.isArray(displayedPlants) ? displayedPlants : [],
+    stats: stats || {},
     loading,
     loadingMore,
     error,
@@ -333,7 +334,7 @@ export const usePlantsListOptimized = () => {
     sortOrder,
     
     // Computed
-    filteredPlantsCount: processedPlants.length,
+    filteredPlantsCount: Array.isArray(processedPlants) ? processedPlants.length : 0,
     totalCount,
     hasMore,
     shouldUseVirtualization,
@@ -357,9 +358,9 @@ export const usePlantsListOptimized = () => {
     
     // Performance data
     performanceMetrics: {
-      totalPlants: allPlants.length,
-      displayedPlants: displayedPlants.length,
-      filteredPlants: processedPlants.length,
+      totalPlants: Array.isArray(allPlants) ? allPlants.length : 0,
+      displayedPlants: Array.isArray(displayedPlants) ? displayedPlants.length : 0,
+      filteredPlants: Array.isArray(processedPlants) ? processedPlants.length : 0,
       virtualizationEnabled: shouldUseVirtualization,
     }
   };
