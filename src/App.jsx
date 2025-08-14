@@ -92,6 +92,8 @@ function App() {
               {/* Admin routes - RBAC protected */}
               <Route path="/admin" element={<ProtectedAdminRoute />}>
                 <Route element={<AdminLayout />}>
+                  {/* Default: redirect /admin to /admin/dashboard */}
+                  <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="users" element={<UserList />} />
                   <Route path="users/:id" element={<UserDetail />} />
