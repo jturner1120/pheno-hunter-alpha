@@ -84,6 +84,14 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+              {/* Admin routes - RBAC protected */}
+              <Route path="/admin" element={<ProtectedAdminRoute />}>
+                <Route element={<AdminLayout />}>
+                  <Route path="dashboard" element={<AdminDashboard />} />
+                  <Route path="users" element={<UserList />} />
+                  <Route path="users/:id" element={<UserDetail />} />
+                </Route>
+              </Route>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -1,0 +1,9 @@
+/* Basic styling for admin layout */
+.admin-layout {
+  min-height: 100vh;
+}
+.admin-nav {
+  min-width: 16rem;
+  background: #fff;
+  border-right: 1px solid #e5e7eb;
+}
