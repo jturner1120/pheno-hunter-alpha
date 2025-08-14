@@ -22,6 +22,8 @@ import SessionStatus from './components/SessionStatus'
 import ProtectedAdminRoute from './admin/ProtectedAdminRoute';
 import AdminLayout from './admin/AdminLayout';
 
+import AdminDashboard from './admin/AdminDashboard';
+
 function App() {
   return (
     <AuthProvider>
