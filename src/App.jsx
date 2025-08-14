@@ -20,6 +20,8 @@ import NotFound from './components/NotFound'
 import SessionWarning from './components/SessionWarning'
 import SessionStatus from './components/SessionStatus'
 
+import ProtectedAdminRoute from './admin/ProtectedAdminRoute';
+
 function App() {
   return (
     <AuthProvider>
