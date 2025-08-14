@@ -19,8 +19,8 @@ import PredictiveAnalytics from './components/predictions/PredictiveAnalytics'
 import NotFound from './components/NotFound'
 import SessionWarning from './components/SessionWarning'
 import SessionStatus from './components/SessionStatus'
-
 import ProtectedAdminRoute from './admin/ProtectedAdminRoute';
+import AdminLayout from './admin/AdminLayout';
 
 function App() {
   return (
