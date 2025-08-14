@@ -21,8 +21,9 @@ import SessionWarning from './components/SessionWarning'
 import SessionStatus from './components/SessionStatus'
 import ProtectedAdminRoute from './admin/ProtectedAdminRoute';
 import AdminLayout from './admin/AdminLayout';
-
 import AdminDashboard from './admin/AdminDashboard';
+import UserList from './admin/UserList';
+import UserDetail from './admin/UserDetail';
 
 function App() {
   return (
