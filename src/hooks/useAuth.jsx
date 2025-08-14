@@ -5,19 +5,61 @@ import {
   signOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
+import { doc, setDoc } from 'firebase/firestore';
 import { logInfo, logError } from '../utils/logger';
 
-const AuthContext = createContext();
+// Centralized error mapping utility
+function mapAuthError(code, defaultMsg) {
+  switch (code) {
+    case 'auth/email-already-in-use': return 'An account with this email already exists';
+    case 'auth/invalid-email': return 'Invalid email address';
+    case 'auth/weak-password': return 'Password should be at least 6 characters';
+    case 'auth/invalid-credential': return 'Invalid email or password';
+    case 'auth/user-not-found': return 'No account found with this email';
+    case 'auth/wrong-password': return 'Incorrect password';
+    case 'auth/user-disabled': return 'This account has been disabled';
+    default: return defaultMsg;
+  }
+}
 
-// Security configuration
-const SECURITY_CONFIG = {
-  INACTIVITY_TIMEOUT: 30 * 60 * 1000, // 30 minutes of inactivity
-  MAX_SESSION_DURATION: 8 * 60 * 60 * 1000, // 8 hours maximum session
-  WARNING_BEFORE_LOGOUT: 5 * 60 * 1000, // Warn user 5 minutes before logout
-  SESSION_STORAGE_KEY: 'phenohunter_session',
-  LAST_ACTIVITY_KEY: 'phenohunter_last_activity'
-};
+// Dynamic session config based on role, with feature toggles
+function getSessionConfig(role) {
+  // === FEATURE TOGGLES ===
+  // To enable/disable session features, set these to true/false:
+  // ENABLE_INACTIVITY_TIMEOUT: If false, disables inactivity timeout for all users
+  // ENABLE_SESSION_WARNING: If false, disables session warning modal for all users
+  // Example usage:
+  //   const ENABLE_INACTIVITY_TIMEOUT = false; // disables inactivity timeout
+  //   const ENABLE_SESSION_WARNING = false;    // disables session warning
+  // You can also move these to environment variables or a config file for production.
+  const ENABLE_INACTIVITY_TIMEOUT = true; // Set to false to disable inactivity timeout
+  const ENABLE_SESSION_WARNING = true;    // Set to false to disable session warning
+
+  if (role === 'ROLE_ADMIN') {
+    return {
+      INACTIVITY_TIMEOUT: ENABLE_INACTIVITY_TIMEOUT ? 30 * 60 * 1000 : null,
+      MAX_SESSION_DURATION: 30 * 60 * 1000,
+      WARNING_BEFORE_LOGOUT: ENABLE_SESSION_WARNING ? 5 * 60 * 1000 : null,
+      SESSION_STORAGE_KEY: 'phenohunter_session',
+      LAST_ACTIVITY_KEY: 'phenohunter_last_activity',
+      ENABLE_INACTIVITY_TIMEOUT,
+      ENABLE_SESSION_WARNING
+    };
+  }
+  // Default for regular users
+  return {
+    INACTIVITY_TIMEOUT: ENABLE_INACTIVITY_TIMEOUT ? 30 * 60 * 1000 : null,
+    MAX_SESSION_DURATION: 8 * 60 * 60 * 1000,
+    WARNING_BEFORE_LOGOUT: ENABLE_SESSION_WARNING ? 5 * 60 * 1000 : null,
+    SESSION_STORAGE_KEY: 'phenohunter_session',
+    LAST_ACTIVITY_KEY: 'phenohunter_last_activity',
+    ENABLE_INACTIVITY_TIMEOUT,
+    ENABLE_SESSION_WARNING
+  };
+}
+
+const AuthContext = createContext();
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -33,7 +75,8 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [sessionWarning, setSessionWarning] = useState(false);
   const [timeUntilLogout, setTimeUntilLogout] = useState(0);
-  
+  const [securityConfig, setSecurityConfig] = useState(getSessionConfig());
+
   // Refs for timers
   const inactivityTimer = useRef(null);
   const sessionTimer = useRef(null);
@@ -63,14 +106,14 @@ export const AuthProvider = ({ children }) => {
   // Update last activity timestamp
   const updateLastActivity = useCallback(() => {
     const now = Date.now();
-    sessionStorage.setItem(SECURITY_CONFIG.LAST_ACTIVITY_KEY, now.toString());
+    sessionStorage.setItem(securityConfig.LAST_ACTIVITY_KEY, now.toString());
     return now;
   }, []);
 
   // Check if session has expired
   const isSessionExpired = useCallback(() => {
-    const sessionStart = sessionStorage.getItem(SECURITY_CONFIG.SESSION_STORAGE_KEY);
-    const lastActivity = sessionStorage.getItem(SECURITY_CONFIG.LAST_ACTIVITY_KEY);
+    const sessionStart = sessionStorage.getItem(securityConfig.SESSION_STORAGE_KEY);
+    const lastActivity = sessionStorage.getItem(securityConfig.LAST_ACTIVITY_KEY);
     
     if (!sessionStart || !lastActivity) return false;
     
@@ -78,8 +121,8 @@ export const AuthProvider = ({ children }) => {
     const sessionAge = now - parseInt(sessionStart);
     const timeSinceActivity = now - parseInt(lastActivity);
     
-    return sessionAge > SECURITY_CONFIG.MAX_SESSION_DURATION || 
-           timeSinceActivity > SECURITY_CONFIG.INACTIVITY_TIMEOUT;
+    return sessionAge > securityConfig.MAX_SESSION_DURATION || 
+           timeSinceActivity > securityConfig.INACTIVITY_TIMEOUT;
   }, []);
 
   // Force logout due to security timeout
@@ -90,8 +133,8 @@ export const AuthProvider = ({ children }) => {
     setTimeUntilLogout(0);
     
     // Clear session storage
-    sessionStorage.removeItem(SECURITY_CONFIG.SESSION_STORAGE_KEY);
-    sessionStorage.removeItem(SECURITY_CONFIG.LAST_ACTIVITY_KEY);
+    sessionStorage.removeItem(securityConfig.SESSION_STORAGE_KEY);
+    sessionStorage.removeItem(securityConfig.LAST_ACTIVITY_KEY);
     
     try {
       await signOut(auth);
@@ -103,7 +146,7 @@ export const AuthProvider = ({ children }) => {
   // Show logout warning
   const showLogoutWarning = useCallback(() => {
     setSessionWarning(true);
-    setTimeUntilLogout(SECURITY_CONFIG.WARNING_BEFORE_LOGOUT / 1000);
+    setTimeUntilLogout(securityConfig.WARNING_BEFORE_LOGOUT / 1000);
     
     // Start countdown
     warningCountdown.current = setInterval(() => {
@@ -134,15 +177,21 @@ export const AuthProvider = ({ children }) => {
     clearAllTimers();
     
     // Set inactivity timer
-    inactivityTimer.current = setTimeout(() => {
-      showLogoutWarning();
-    }, SECURITY_CONFIG.INACTIVITY_TIMEOUT - SECURITY_CONFIG.WARNING_BEFORE_LOGOUT);
+    if (securityConfig.ENABLE_INACTIVITY_TIMEOUT && securityConfig.INACTIVITY_TIMEOUT) {
+      inactivityTimer.current = setTimeout(() => {
+        if (securityConfig.ENABLE_SESSION_WARNING && securityConfig.WARNING_BEFORE_LOGOUT) {
+          showLogoutWarning();
+        } else {
+          forceLogout('inactivity_timeout');
+        }
+      }, securityConfig.INACTIVITY_TIMEOUT - (securityConfig.WARNING_BEFORE_LOGOUT || 0));
+    }
     
     // Set maximum session timer
-    const sessionStart = sessionStorage.getItem(SECURITY_CONFIG.SESSION_STORAGE_KEY);
+    const sessionStart = sessionStorage.getItem(securityConfig.SESSION_STORAGE_KEY);
     if (sessionStart) {
       const sessionAge = Date.now() - parseInt(sessionStart);
-      const remainingSessionTime = SECURITY_CONFIG.MAX_SESSION_DURATION - sessionAge;
+      const remainingSessionTime = securityConfig.MAX_SESSION_DURATION - sessionAge;
       
       if (remainingSessionTime > 0) {
         sessionTimer.current = setTimeout(() => {
@@ -173,10 +222,16 @@ export const AuthProvider = ({ children }) => {
       clearTimeout(inactivityTimer.current);
     }
     
-    inactivityTimer.current = setTimeout(() => {
-      showLogoutWarning();
-    }, SECURITY_CONFIG.INACTIVITY_TIMEOUT - SECURITY_CONFIG.WARNING_BEFORE_LOGOUT);
-  }, [isAuthenticated, sessionWarning, extendSession, updateLastActivity, showLogoutWarning]);
+    if (securityConfig.ENABLE_INACTIVITY_TIMEOUT && securityConfig.INACTIVITY_TIMEOUT) {
+      inactivityTimer.current = setTimeout(() => {
+        if (securityConfig.ENABLE_SESSION_WARNING && securityConfig.WARNING_BEFORE_LOGOUT) {
+          showLogoutWarning();
+        } else {
+          forceLogout('inactivity_timeout');
+        }
+      }, securityConfig.INACTIVITY_TIMEOUT - (securityConfig.WARNING_BEFORE_LOGOUT || 0));
+    }
+  }, [isAuthenticated, sessionWarning, extendSession, updateLastActivity, showLogoutWarning, forceLogout]);
 
   useEffect(() => {
     console.log('🔥 Setting up Firebase auth listener...');
@@ -198,13 +253,21 @@ export const AuthProvider = ({ children }) => {
           name: firebaseUser.displayName || firebaseUser.email.split('@')[0]
         };
         console.log('🔥 User data:', userData);
-        setUser(userData);
+        
+        // Determine role (default to ROLE_USER if not present)
+        let role = 'ROLE_USER';
+        if (firebaseUser.email === 'admin@example.com') role = 'ROLE_ADMIN'; // Example: replace with your logic
+        
+        // Set dynamic session config
+        setSecurityConfig(getSessionConfig(role));
+        
+        setUser({ ...userData, role });
         setIsAuthenticated(true);
         
         // Initialize session if not exists
         const now = Date.now();
-        if (!sessionStorage.getItem(SECURITY_CONFIG.SESSION_STORAGE_KEY)) {
-          sessionStorage.setItem(SECURITY_CONFIG.SESSION_STORAGE_KEY, now.toString());
+        if (!sessionStorage.getItem(securityConfig.SESSION_STORAGE_KEY)) {
+          sessionStorage.setItem(securityConfig.SESSION_STORAGE_KEY, now.toString());
         }
         updateLastActivity();
         
@@ -222,8 +285,8 @@ export const AuthProvider = ({ children }) => {
         setTimeUntilLogout(0);
         
         // Clear session storage
-        sessionStorage.removeItem(SECURITY_CONFIG.SESSION_STORAGE_KEY);
-        sessionStorage.removeItem(SECURITY_CONFIG.LAST_ACTIVITY_KEY);
+        sessionStorage.removeItem(securityConfig.SESSION_STORAGE_KEY);
+        sessionStorage.removeItem(securityConfig.LAST_ACTIVITY_KEY);
         
         logInfo('User signed out');
       }
@@ -251,8 +314,8 @@ export const AuthProvider = ({ children }) => {
     // Handle browser close/refresh
     const handleBeforeUnload = (e) => {
       // Clear session storage when browser closes
-      sessionStorage.removeItem(SECURITY_CONFIG.SESSION_STORAGE_KEY);
-      sessionStorage.removeItem(SECURITY_CONFIG.LAST_ACTIVITY_KEY);
+      sessionStorage.removeItem(securityConfig.SESSION_STORAGE_KEY);
+      sessionStorage.removeItem(securityConfig.LAST_ACTIVITY_KEY);
     };
 
     // Handle page visibility change (tab switching, minimizing)
@@ -283,15 +346,51 @@ export const AuthProvider = ({ children }) => {
     };
   }, [isAuthenticated, handleUserActivity, updateLastActivity, isSessionExpired, forceLogout]);
 
+  const signup = async (email, password, name) => {
+    try {
+      console.log('🔥 Attempting signup for:', email);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      // Save user info to Firestore
+      await setDoc(doc(db, 'users', firebaseUser.uid), {
+        email: firebaseUser.email,
+        username: name || firebaseUser.email.split('@')[0],
+        role: 'ROLE_USER',
+        status: 'active',
+        createdDate: new Date().toISOString(),
+        lastLogin: new Date().toISOString()
+      });
+
+      // Initialize session
+      const now = Date.now();
+      sessionStorage.setItem(securityConfig.SESSION_STORAGE_KEY, now.toString());
+      updateLastActivity();
+      console.log('🔥 Signup successful:', firebaseUser.uid);
+      logInfo('User signed up successfully', { userId: firebaseUser.uid });
+      return { success: true };
+    } catch (error) {
+      console.error('🔥 Signup error:', error.code, error.message);
+      logError(error, { operation: 'signup', email });
+      let errorMessage = mapAuthError(error.code, 'Signup failed');
+      return { success: false, error: errorMessage };
+    }
+  };
+
   const login = async (email, password) => {
     try {
       console.log('🔥 Attempting login for:', email);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       
+      // Update lastLogin in Firestore
+      await setDoc(doc(db, 'users', firebaseUser.uid), {
+        lastLogin: new Date().toISOString()
+      }, { merge: true });
+      
       // Initialize session
       const now = Date.now();
-      sessionStorage.setItem(SECURITY_CONFIG.SESSION_STORAGE_KEY, now.toString());
+      sessionStorage.setItem(securityConfig.SESSION_STORAGE_KEY, now.toString());
       updateLastActivity();
       
       console.log('🔥 Login successful:', firebaseUser.uid);
@@ -300,67 +399,7 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('🔥 Login error:', error.code, error.message);
       logError(error, { operation: 'login', email });
-      let errorMessage = 'Login failed';
-      
-      // Handle specific Firebase auth errors
-      switch (error.code) {
-        case 'auth/user-not-found':
-          errorMessage = 'No account found with this email';
-          break;
-        case 'auth/wrong-password':
-          errorMessage = 'Incorrect password';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Invalid email address';
-          break;
-        case 'auth/user-disabled':
-          errorMessage = 'This account has been disabled';
-          break;
-        case 'auth/invalid-credential':
-          errorMessage = 'Invalid email or password';
-          break;
-        default:
-          errorMessage = error.message;
-      }
-      
-      return { success: false, error: errorMessage };
-    }
-  };
-
-  const signup = async (email, password, name) => {
-    try {
-      console.log('🔥 Attempting signup for:', email);
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
-      
-      // Initialize session
-      const now = Date.now();
-      sessionStorage.setItem(SECURITY_CONFIG.SESSION_STORAGE_KEY, now.toString());
-      updateLastActivity();
-      
-      console.log('🔥 Signup successful:', firebaseUser.uid);
-      logInfo('User signed up successfully', { userId: firebaseUser.uid });
-      return { success: true };
-    } catch (error) {
-      console.error('🔥 Signup error:', error.code, error.message);
-      logError(error, { operation: 'signup', email });
-      let errorMessage = 'Signup failed';
-      
-      // Handle specific Firebase auth errors
-      switch (error.code) {
-        case 'auth/email-already-in-use':
-          errorMessage = 'An account with this email already exists';
-          break;
-        case 'auth/invalid-email':
-          errorMessage = 'Invalid email address';
-          break;
-        case 'auth/weak-password':
-          errorMessage = 'Password should be at least 6 characters';
-          break;
-        default:
-          errorMessage = error.message;
-      }
-      
+      let errorMessage = mapAuthError(error.code, 'Login failed');
       return { success: false, error: errorMessage };
     }
   };
@@ -372,8 +411,8 @@ export const AuthProvider = ({ children }) => {
       setTimeUntilLogout(0);
       
       // Clear session storage
-      sessionStorage.removeItem(SECURITY_CONFIG.SESSION_STORAGE_KEY);
-      sessionStorage.removeItem(SECURITY_CONFIG.LAST_ACTIVITY_KEY);
+      sessionStorage.removeItem(securityConfig.SESSION_STORAGE_KEY);
+      sessionStorage.removeItem(securityConfig.LAST_ACTIVITY_KEY);
       
       await signOut(auth);
       logInfo('User logged out');
@@ -393,7 +432,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     extendSession,
     // Security info for debugging/monitoring
-    securityConfig: SECURITY_CONFIG
+    securityConfig
   };
 
   return (
