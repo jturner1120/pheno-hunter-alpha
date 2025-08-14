@@ -6,7 +6,7 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 import { auth, db } from '../config/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { logInfo, logError } from '../utils/logger';
 
 // Centralized error mapping utility
@@ -236,7 +236,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     console.log('🔥 Setting up Firebase auth listener...');
     // Listen for authentication state changes
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       console.log('🔥 Auth state changed:', firebaseUser ? 'User logged in' : 'User logged out');
       if (firebaseUser) {
         // Check if session is expired before setting user
@@ -245,7 +245,7 @@ export const AuthProvider = ({ children }) => {
           forceLogout('session_expired');
           return;
         }
-        
+
         // User is signed in
         const userData = {
           id: firebaseUser.uid,
@@ -253,27 +253,38 @@ export const AuthProvider = ({ children }) => {
           name: firebaseUser.displayName || firebaseUser.email.split('@')[0]
         };
         console.log('🔥 User data:', userData);
-        
-        // Determine role (default to ROLE_USER if not present)
+
+        // Fetch user document from Firestore to get role
         let role = 'ROLE_USER';
-        if (firebaseUser.email === 'admin@example.com') role = 'ROLE_ADMIN'; // Example: replace with your logic
-        
+        try {
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          const userDocSnap = await getDoc(userDocRef);
+          if (userDocSnap.exists()) {
+            const userDocData = userDocSnap.data();
+            role = userDocData.role || 'ROLE_USER';
+          } else {
+            console.warn('No Firestore user document found for:', firebaseUser.uid);
+          }
+        } catch (err) {
+          console.error('Error fetching user document:', err);
+        }
+
         // Set dynamic session config
         setSecurityConfig(getSessionConfig(role));
-        
+
         setUser({ ...userData, role });
         setIsAuthenticated(true);
-        
+
         // Initialize session if not exists
         const now = Date.now();
         if (!sessionStorage.getItem(securityConfig.SESSION_STORAGE_KEY)) {
           sessionStorage.setItem(securityConfig.SESSION_STORAGE_KEY, now.toString());
         }
         updateLastActivity();
-        
+
         // Start security timers
         startSecurityTimers();
-        
+
         logInfo('User authenticated', { userId: userData.id });
       } else {
         // User is signed out
@@ -283,11 +294,11 @@ export const AuthProvider = ({ children }) => {
         setIsAuthenticated(false);
         setSessionWarning(false);
         setTimeUntilLogout(0);
-        
+
         // Clear session storage
         sessionStorage.removeItem(securityConfig.SESSION_STORAGE_KEY);
         sessionStorage.removeItem(securityConfig.LAST_ACTIVITY_KEY);
-        
+
         logInfo('User signed out');
       }
       setLoading(false);
